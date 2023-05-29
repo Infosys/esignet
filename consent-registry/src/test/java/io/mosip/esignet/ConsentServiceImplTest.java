@@ -6,6 +6,8 @@ import io.mosip.esignet.api.spi.AuditPlugin;
 import io.mosip.esignet.core.dto.ConsentRequest;
 import io.mosip.esignet.core.dto.UserConsentRequest;
 import io.mosip.esignet.entity.Consent;
+import io.mosip.esignet.mapper.ConsentMapper;
+import io.mosip.esignet.mapper.ConsentMapperImpl;
 import io.mosip.esignet.repository.ConsentRepository;
 import io.mosip.esignet.services.ConsentServiceImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -16,14 +18,21 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.test.context.junit4.SpringRunner;
+
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+
 @Slf4j
 @RunWith(MockitoJUnitRunner.class)
+@ComponentScan(basePackageClasses = io.mosip.esignet.mapper.ConsentMapper.class)
 public class ConsentServiceImplTest {
 
 
@@ -31,10 +40,15 @@ public class ConsentServiceImplTest {
     ConsentRepository consentRepository;
 
     @Mock
+    ConsentMapperImpl consentMapper;
+
+    @Mock
     AuditPlugin auditWrapper;
 
     @InjectMocks
     ConsentServiceImpl consentService;
+
+
 
 
 
@@ -53,6 +67,16 @@ public class ConsentServiceImplTest {
 
         Optional<Consent> consentOptional = Optional.of(consent);
         Mockito.when(consentRepository.findFirstByClientIdAndPsuValueOrderByCreatedOnDesc(Mockito.anyString(),Mockito.anyString())).thenReturn(consentOptional);
+
+        io.mosip.esignet.core.dto.Consent consent1 = new io.mosip.esignet.core.dto.Consent();
+        consent1.setId(consent.getId());
+        consent1.setHash(consent.getHash());
+        consent1.setPsuValue(consent.getPsuValue());
+        consent1.setExpiration(consent.getExpiration());
+        consent1.setClientId(consent.getClientId());
+
+
+        Mockito.when(consentMapper.toDto(consent)).thenReturn(consent1);
 
         UserConsentRequest userConsentRequest = new UserConsentRequest();
         userConsentRequest.setClientId("1234");
@@ -114,8 +138,8 @@ public class ConsentServiceImplTest {
         consentRequest.setPsu_token("psuValue");
         consentRequest.setClaims(claims);
 
-        Map<String,Boolean> authorizeScopes = Map.of("given_name",true,"email",true);
-        consentRequest.setAuthorizeScopes(authorizeScopes);
+       // Map<String,Boolean> authorizeScopes = Map.of("given_name",true,"email",true);
+        //consentRequest.setAuthorizeScopes(authorizeScopes);
         consentRequest.setExpiration(LocalDateTime.now());
         consentRequest.setSignature("signature");
 
@@ -128,7 +152,19 @@ public class ConsentServiceImplTest {
         consent.setPsuValue("psuValue");
         consent.setExpiration(LocalDateTime.now());
 
+        Mockito.when(consentMapper.toEntity(Mockito.any(ConsentRequest.class))).thenReturn(consent);
+
         Mockito.when(consentRepository.save(Mockito.any())).thenReturn(consent);
+
+
+        io.mosip.esignet.core.dto.Consent consent1 = new io.mosip.esignet.core.dto.Consent();
+        consent1.setId(consent.getId());
+        consent1.setHash(consent.getHash());
+        consent1.setPsuValue(consent.getPsuValue());
+        consent1.setExpiration(consent.getExpiration());
+        consent1.setClientId(consent.getClientId());
+
+        Mockito.when(consentMapper.toDto(Mockito.any(Consent.class))).thenReturn(consent1);
 
         io.mosip.esignet.core.dto.Consent userConsentDto = consentService.saveUserConsent(consentRequest);
         Assert.assertNotNull(userConsentDto);

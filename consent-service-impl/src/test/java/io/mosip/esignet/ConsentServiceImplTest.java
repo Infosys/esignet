@@ -6,6 +6,8 @@ import io.mosip.esignet.api.spi.AuditPlugin;
 import io.mosip.esignet.core.dto.UserConsent;
 import io.mosip.esignet.core.dto.UserConsentRequest;
 import io.mosip.esignet.entity.ConsentDetail;
+import io.mosip.esignet.mapper.ConsentMapper;
+import io.mosip.esignet.mapper.ConsentMapperImpl;
 import io.mosip.esignet.repository.ConsentRepository;
 import io.mosip.esignet.services.ConsentServiceImpl;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +18,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
-import org.modelmapper.MappingException;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -34,6 +36,9 @@ public class ConsentServiceImplTest {
 
     @Mock
     AuditPlugin auditWrapper;
+
+    @Autowired
+    ConsentMapper consentMapper;
 
     @InjectMocks
     ConsentServiceImpl consentService;
@@ -64,7 +69,7 @@ public class ConsentServiceImplTest {
 
     }
 
-    @Test(expected = MappingException.class)
+    @Test(expected = RuntimeException.class)
     public void getUserConsent_withInValidClaimsDetails_thenFail(){
         ConsentDetail consentDetail = new ConsentDetail();
         consentDetail.setId(UUID.randomUUID());
@@ -115,7 +120,7 @@ public class ConsentServiceImplTest {
         userConsent.setPsuToken("psuValue");
         userConsent.setClaims(claims);
 
-        Map<String,Boolean> authorizeScopes = Map.of("given_name",true,"email",true);
+        Map<String,Boolean> authorizeScopes = new HashMap<>();//Map.of("given_name",true,"email",true);
         userConsent.setAuthorizationScopes(authorizeScopes);
         userConsent.setExpiry_dtimes(LocalDateTime.now());
         userConsent.setSignature("signature");
@@ -136,7 +141,7 @@ public class ConsentServiceImplTest {
 
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test(expected = NullPointerException.class)
     public void saveUserConsent_withInValidDetails_thenFail(){
             consentService.saveUserConsent(null);
 

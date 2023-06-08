@@ -10,6 +10,7 @@ import io.mosip.esignet.core.dto.UserConsentRequest;
 import io.mosip.esignet.core.spi.ConsentService;
 import io.mosip.esignet.core.util.AuditHelper;
 import io.mosip.esignet.mapper.ConsentMapper;
+import io.mosip.esignet.mapper.ConsentMapperImpl;
 import io.mosip.esignet.repository.ConsentRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,8 @@ public class ConsentServiceImpl implements ConsentService {
     @Autowired
     private AuditPlugin auditWrapper;
 
+    ConsentMapper consentMapper=new ConsentMapperImpl();
+
     @Value("${mosip.esignet.audit.claim-name:preferred_username}")
     private String claimName;
 
@@ -40,7 +43,7 @@ public class ConsentServiceImpl implements ConsentService {
                 findFirstByClientIdAndPsuTokenOrderByCreatedtimesDesc(userConsentRequest.getClientId(),
                         userConsentRequest.getPsuToken());
         if (consentOptional.isPresent()) {
-            ConsentDetail consentDetailDto = ConsentMapper.toDto( consentOptional.get());
+            ConsentDetail consentDetailDto = consentMapper.toDto( consentOptional.get());
 
             return Optional.of(consentDetailDto);
         }
@@ -53,9 +56,11 @@ public class ConsentServiceImpl implements ConsentService {
     @Override
     public ConsentDetail saveUserConsent(UserConsent userConsent) {
         //convert ConsentRequest to Entity
-        io.mosip.esignet.entity.ConsentDetail consentDetail =ConsentMapper.toEntity(userConsent);
+        io.mosip.esignet.entity.ConsentDetail consentDetail =consentMapper.toEntity(userConsent);
+
+        log.info("ConsentDetail:----------------------------- "+consentDetail.toString());
         consentDetail.setCreatedtimes(LocalDateTime.now());
-        ConsentDetail consentDetailDto =ConsentMapper.toDto(consentRepository.save(consentDetail));
+        ConsentDetail consentDetailDto =consentMapper.toDto(consentRepository.save(consentDetail));
         auditWrapper.logAudit(AuditHelper.getClaimValue(SecurityContextHolder.getContext(), claimName),
                 Action.SAVE_USER_CONSENT, ActionStatus.SUCCESS,
                 AuditHelper.buildAuditDto(userConsent.getClientId()), null);

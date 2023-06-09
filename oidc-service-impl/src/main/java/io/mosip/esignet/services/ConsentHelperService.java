@@ -185,9 +185,7 @@ public class ConsentHelperService {
         return ConsentAction.NOCAPTURE;
     }
 
-    private boolean validateSignature(OIDCTransaction transaction, ConsentDetail consentDetail){
-        return true;
-
+    private boolean validateSignature(OIDCTransaction transaction, ConsentDetail consentDetail) {
     }
     private String generateSignedObject(OIDCTransaction transaction, ConsentDetail consentDetail){
         List<String> acceptedClaims = transaction.getAcceptedClaims();

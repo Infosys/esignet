@@ -40,7 +40,7 @@ public class ConsentServiceImpl implements ConsentService {
     public Optional<ConsentDetail> getUserConsent(UserConsentRequest userConsentRequest) {
 
         Optional<io.mosip.esignet.entity.ConsentDetail> consentOptional = consentRepository.
-                findFirstByClientIdAndPsuTokenOrderByCreatedtimesDesc(userConsentRequest.getClientId(),
+                findFirstByClientIdAndPsuToken(userConsentRequest.getClientId(),
                         userConsentRequest.getPsuToken());
         if (consentOptional.isPresent()) {
             ConsentDetail consentDetailDto = consentMapper.toDto( consentOptional.get());

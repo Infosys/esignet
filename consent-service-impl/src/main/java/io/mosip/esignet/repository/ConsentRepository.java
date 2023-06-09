@@ -8,4 +8,6 @@ import java.util.UUID;
 @Repository
 public interface ConsentRepository extends JpaRepository<ConsentDetail, UUID> {
       Optional<ConsentDetail> findFirstByClientIdAndPsuTokenOrderByCreatedtimesDesc(String clientId, String psuToken);
+
+      Optional<ConsentDetail> findFirstByClientIdAndPsuToken(String clientId, String psuToken);
 }

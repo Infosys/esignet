@@ -7,7 +7,6 @@ import io.mosip.esignet.core.dto.UserConsent;
 import io.mosip.esignet.core.dto.UserConsentRequest;
 import io.mosip.esignet.entity.ConsentDetail;
 import io.mosip.esignet.mapper.ConsentMapper;
-import io.mosip.esignet.mapper.ConsentMapperImpl;
 import io.mosip.esignet.repository.ConsentRepository;
 import io.mosip.esignet.services.ConsentServiceImpl;
 import lombok.extern.slf4j.Slf4j;

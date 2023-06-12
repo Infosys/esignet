@@ -6,6 +6,7 @@ create table consent_detail (
     authorization_scopes VARCHAR NOT NULL,
     cr_dtimes TIMESTAMP DEFAULT NOW() NOT NULL,
     expire_dtimes TIMESTAMP,
+    hash VARCHAR,
     signature VARCHAR,
     PRIMARY KEY (id)
 );

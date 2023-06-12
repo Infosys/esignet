@@ -8,7 +8,7 @@ import io.mosip.esignet.core.dto.UserConsentRequest;
 import io.mosip.esignet.entity.ConsentDetail;
 import io.mosip.esignet.mapper.ConsentMapper;
 import io.mosip.esignet.repository.ConsentHistoryRepository;
-import io.mosip.esignet.repository.ConsentRepository;
+import io.mosip.esignet.repository.ConsentDetailRepository;
 import io.mosip.esignet.services.ConsentServiceImpl;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.Assert;
@@ -32,7 +32,7 @@ public class ConsentServiceImplTest {
 
 
     @Mock
-    ConsentRepository consentRepository;
+    ConsentDetailRepository consentDetailRepository;
 
     @Mock
     ConsentHistoryRepository consentHistoryRepository;
@@ -59,7 +59,7 @@ public class ConsentServiceImplTest {
         consentDetail.setExpiredtimes(LocalDateTime.now());
 
         Optional<ConsentDetail> consentOptional = Optional.of(consentDetail);
-        Mockito.when(consentRepository.findFirstByClientIdAndPsuTokenOrderByCreatedtimesDesc(Mockito.anyString(),Mockito.anyString())).thenReturn(consentOptional);
+        Mockito.when(consentDetailRepository.findByClientIdAndPsuToken(Mockito.anyString(),Mockito.anyString())).thenReturn(consentOptional);
 
         UserConsentRequest userConsentRequest = new UserConsentRequest();
         userConsentRequest.setClientId("1234");
@@ -67,8 +67,8 @@ public class ConsentServiceImplTest {
 
         Optional<io.mosip.esignet.core.dto.ConsentDetail> userConsentDto = consentService.getUserConsent(userConsentRequest);
         Assert.assertNotNull(userConsentDto);
-       // Assert.assertEquals("1234", userConsentDto.get().getClientId());
-        //Assert.assertEquals("psuValue", userConsentDto.get().getPsuToken());
+        Assert.assertEquals("1234", userConsentDto.get().getClientId());
+        Assert.assertEquals("psuValue", userConsentDto.get().getPsuToken());
 
     }
 
@@ -83,7 +83,7 @@ public class ConsentServiceImplTest {
         consentDetail.setExpiredtimes(LocalDateTime.now());
 
         Optional<ConsentDetail> consentOptional = Optional.of(consentDetail);
-        Mockito.when(consentRepository.findFirstByClientIdAndPsuTokenOrderByCreatedtimesDesc(Mockito.anyString(),Mockito.anyString())).thenReturn(consentOptional);
+        Mockito.when(consentDetailRepository.findByClientIdAndPsuToken(Mockito.anyString(),Mockito.anyString())).thenReturn(consentOptional);
 
         UserConsentRequest userConsentRequest = new UserConsentRequest();
         userConsentRequest.setClientId("1234");
@@ -94,7 +94,7 @@ public class ConsentServiceImplTest {
 
     @Test
     public void getUserConsent_withEmptyConsent_thenPass(){
-        Mockito.when(consentRepository.findFirstByClientIdAndPsuTokenOrderByCreatedtimesDesc(Mockito.anyString(),Mockito.anyString())).thenReturn(Optional.empty());
+        Mockito.when(consentDetailRepository.findByClientIdAndPsuToken(Mockito.anyString(),Mockito.anyString())).thenReturn(Optional.empty());
 
         UserConsentRequest userConsentRequest = new UserConsentRequest();
         userConsentRequest.setClientId("1234");
@@ -136,7 +136,7 @@ public class ConsentServiceImplTest {
         consentDetail.setPsuToken("psuValue");
         consentDetail.setExpiredtimes(LocalDateTime.now());
 
-        Mockito.when(consentRepository.save(Mockito.any())).thenReturn(consentDetail);
+        Mockito.when(consentDetailRepository.save(Mockito.any())).thenReturn(consentDetail);
 
         io.mosip.esignet.core.dto.ConsentDetail userConsentDtoDetail = consentService.saveUserConsent(userConsent);
         Assert.assertNotNull(userConsentDtoDetail);

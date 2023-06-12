@@ -1,7 +1,7 @@
 package io.mosip.esignet;
 
 import io.mosip.esignet.entity.ConsentDetail;
-import io.mosip.esignet.repository.ConsentRepository;
+import io.mosip.esignet.repository.ConsentDetailRepository;
 import org.junit.Assert;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -19,7 +19,7 @@ import java.util.UUID;
 public class ConsentDetailRepositoryTest {
 
     @Autowired
-    private ConsentRepository consentRepository;
+    private ConsentDetailRepository consentDetailRepository;
 
     @Test
     public void createConsent_withValidDetail_thenPass() {
@@ -27,6 +27,7 @@ public class ConsentDetailRepositoryTest {
         ConsentDetail consentDetail =new ConsentDetail();
         UUID uuid=UUID.randomUUID();
         LocalDateTime date = LocalDateTime.of(2019, 12, 12, 12, 12, 12);
+        consentDetail.setId(uuid);
         consentDetail.setClientId("123");
         consentDetail.setPsuToken("abc");
         consentDetail.setClaims("claims");
@@ -34,15 +35,15 @@ public class ConsentDetailRepositoryTest {
         consentDetail.setCreatedtimes(date);
         consentDetail.setExpiredtimes(LocalDateTime.now());
         consentDetail.setSignature("signature");
-        consentDetail =consentRepository.save(consentDetail);
+        consentDetail = consentDetailRepository.save(consentDetail);
         Assert.assertNotNull(consentDetail);
 
         Optional<ConsentDetail> result;
 
-        result = consentRepository.findFirstByClientIdAndPsuTokenOrderByCreatedtimesDesc("123", "abc");
+        result = consentDetailRepository.findByClientIdAndPsuToken("123", "abc");
         Assert.assertTrue(result.isPresent());
 
-        result = consentRepository.findFirstByClientIdAndPsuTokenOrderByCreatedtimesDesc("123", "abcd");
+        result = consentDetailRepository.findByClientIdAndPsuToken("123", "abcd");
         Assert.assertFalse(result.isPresent());
     }
 
@@ -61,7 +62,7 @@ public class ConsentDetailRepositoryTest {
         consentDetail.setExpiredtimes(LocalDateTime.now());
         consentDetail.setSignature("signature");
         try {
-            consentRepository.saveAndFlush(consentDetail);
+            consentDetailRepository.saveAndFlush(consentDetail);
         } catch (ConstraintViolationException e) {
             Assert.assertTrue(e.getConstraintViolations().stream()
                     .anyMatch( v -> v.getPropertyPath().toString().equals("clientId")));
@@ -85,7 +86,7 @@ public class ConsentDetailRepositoryTest {
         consentDetail.setExpiredtimes(LocalDateTime.now());
         consentDetail.setSignature("signature");
         try {
-            consentRepository.saveAndFlush(consentDetail);
+            consentDetailRepository.saveAndFlush(consentDetail);
         } catch (ConstraintViolationException e) {
             Assert.assertTrue(e.getConstraintViolations().stream()
                     .anyMatch( v -> v.getPropertyPath().toString().equals("psuToken")));
@@ -109,7 +110,7 @@ public class ConsentDetailRepositoryTest {
         consentDetail.setExpiredtimes(LocalDateTime.now());
         consentDetail.setSignature("signature");
         try {
-            consentRepository.saveAndFlush(consentDetail);
+            consentDetailRepository.saveAndFlush(consentDetail);
         } catch (ConstraintViolationException e) {
             Assert.assertTrue(e.getConstraintViolations().stream()
                     .anyMatch( v -> v.getPropertyPath().toString().equals("claims")));
@@ -133,7 +134,7 @@ public class ConsentDetailRepositoryTest {
         consentDetail.setExpiredtimes(LocalDateTime.now());
         consentDetail.setSignature("signature");
         try {
-            consentRepository.saveAndFlush(consentDetail);
+            consentDetailRepository.saveAndFlush(consentDetail);
         } catch (ConstraintViolationException e) {
             Assert.assertTrue(e.getConstraintViolations().stream()
                     .anyMatch( v -> v.getPropertyPath().toString().equals("authorizationScopes")));
@@ -156,7 +157,7 @@ public class ConsentDetailRepositoryTest {
         consentDetail.setExpiredtimes(LocalDateTime.now());
         consentDetail.setSignature("signature");
         try {
-            consentRepository.saveAndFlush(consentDetail);
+            consentDetailRepository.saveAndFlush(consentDetail);
         } catch (ConstraintViolationException e) {
             Assert.assertTrue(e.getConstraintViolations().stream()
                     .anyMatch( v -> v.getPropertyPath().toString().equals("createdtimes")));

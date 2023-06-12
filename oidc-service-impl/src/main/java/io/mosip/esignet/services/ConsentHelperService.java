@@ -1,5 +1,6 @@
 package io.mosip.esignet.services;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
 import com.nimbusds.jose.JWSObject;
@@ -13,8 +14,12 @@ import io.mosip.esignet.core.spi.ConsentService;
 import io.mosip.esignet.core.util.KafkaHelperService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.text.ParseException;
 import java.util.*;
@@ -33,6 +38,13 @@ public class ConsentHelperService {
 
     @Autowired
     private KafkaHelperService kafkaHelperService;
+
+    @Autowired
+    @Qualifier("passwordEncoder")
+    private PasswordEncoder passwordEncoder;
+
+    @Autowired
+    ObjectMapper objectMapper=new ObjectMapper();
 
     @Value("${mosip.esignet.kafka.linked-auth-code.topic}")
     private String linkedAuthCodeTopicName;
@@ -186,6 +198,7 @@ public class ConsentHelperService {
     }
 
     private boolean validateSignature(OIDCTransaction transaction, ConsentDetail consentDetail) {
+        return true;
     }
     private String generateSignedObject(OIDCTransaction transaction, ConsentDetail consentDetail){
         List<String> acceptedClaims = transaction.getAcceptedClaims();
@@ -210,6 +223,66 @@ public class ConsentHelperService {
 
         }
         return jwsObject == null ? "": jwsObject.serialize();
+    }
+
+    public void hashedUserConsent(Claims claims,Map<String, Boolean> authorizeScopes) throws Exception
+    {
+        Map<String,Object> combinedMapOfClaimsAndAuthorizeSocope = new LinkedHashMap<>();
+        //sortin for userInfo map
+
+        // Convert the Map to a List of entries
+        List<Map.Entry<String, ClaimDetail>> entryList;
+        Map<String, ClaimDetail> sortedMap = new LinkedHashMap<>();
+        if(claims.getUserinfo()!=null){
+            entryList = new ArrayList<>(claims.getUserinfo().entrySet());
+
+            // Sort the List based on the entry values
+            Collections.sort(entryList, new Comparator<Map.Entry<String, ClaimDetail>>() {
+                public int compare(Map.Entry<String, ClaimDetail> o1, Map.Entry<String, ClaimDetail> o2) {
+                    return o1.getKey().compareTo(o2.getKey());
+                }
+            });
+
+            for (Map.Entry<String, ClaimDetail> entry : entryList) {
+                sortedMap.put(entry.getKey(), entry.getValue());
+            }
+
+        }
+        //Now for sorting  id_token
+        if(claims.getId_token()!=null)
+        {
+            entryList = new ArrayList<>(claims.getId_token().entrySet());
+            Collections.sort(entryList, new Comparator<Map.Entry<String, ClaimDetail>>() {
+                public int compare(Map.Entry<String, ClaimDetail> o1, Map.Entry<String, ClaimDetail> o2) {
+                    return o1.getKey().compareTo(o2.getKey());
+                }
+            });
+            for (Map.Entry<String, ClaimDetail> entry : entryList) {
+                sortedMap.put(entry.getKey(), entry.getValue());
+            }
+
+        }
+        //Now for authorizeScopes
+        Map<String,Boolean> sortedAuthorzeScopeMap=new LinkedHashMap<>();
+
+        List<Map.Entry<String,Boolean>>authorizeScopesList = new ArrayList<>(authorizeScopes.entrySet());
+        Collections.sort(authorizeScopesList, new Comparator<Map.Entry<String, Boolean>>() {
+            public int compare(Map.Entry<String, Boolean> o1, Map.Entry<String, Boolean> o2) {
+                return o1.getKey().compareTo(o2.getKey());
+            }
+        });
+        for (Map.Entry<String, Boolean> entry : authorizeScopesList) {
+            sortedAuthorzeScopeMap.put(entry.getKey(), entry.getValue());
+        }
+        combinedMapOfClaimsAndAuthorizeSocope.put("claims",sortedMap);
+        combinedMapOfClaimsAndAuthorizeSocope.put("authorizeScopes",sortedAuthorzeScopeMap);
+        String s=combinedMapOfClaimsAndAuthorizeSocope.toString().trim().replace(" ","");
+        log.info("combinedMap "+s);
+        String s1 = objectMapper.writeValueAsString(combinedMapOfClaimsAndAuthorizeSocope);
+        log.info("s1 = " + s1);
+        String encode = passwordEncoder.encode(s);
+        log.info("encode = " + encode);
+
     }
 
 }

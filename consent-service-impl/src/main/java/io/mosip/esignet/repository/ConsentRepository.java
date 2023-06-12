@@ -9,5 +9,7 @@ import java.util.UUID;
 public interface ConsentRepository extends JpaRepository<ConsentDetail, UUID> {
       Optional<ConsentDetail> findFirstByClientIdAndPsuTokenOrderByCreatedtimesDesc(String clientId, String psuToken);
 
-      Optional<ConsentDetail> findFirstByClientIdAndPsuToken(String clientId, String psuToken);
+      Optional<ConsentDetail> findByClientIdAndPsuToken(String clientId, String psuToken);
+
+      void deleteByClientIdAndPsuToken(String clientId, String psuToken);
 }

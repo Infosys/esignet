@@ -6,6 +6,7 @@ import io.mosip.esignet.api.dto.Claims;
 import io.mosip.esignet.core.dto.UserConsent;
 import io.mosip.esignet.core.exception.EsignetException;
 import io.mosip.esignet.entity.ConsentDetail;
+import io.mosip.esignet.entity.ConsentHistory;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -65,10 +66,13 @@ public interface ConsentMapper {
     ConsentDetail toEntity(UserConsent userConsent);
 
 
+    @Mapping(target="claims",expression = "java(serializeClaims(userConsent.getClaims()))")
+    @Mapping(target="authorizationScopes",expression = "java(serializeMap(userConsent.getAuthorizationScopes()))")
+    ConsentHistory toConsentHistoryEntity(UserConsent userConsent);
+
+
 
     @Mapping(target="claims",expression = "java(deSerializeClaims(consent.getClaims()))")
     @Mapping(target="authorizationScopes",expression = "java(deSerializeMap(consent.getAuthorizationScopes()))")
-//    @Mapping(target="claims",ignore = true)
-//    @Mapping(target="authorizationScopes",ignore = true)
     io.mosip.esignet.core.dto.ConsentDetail toDto(ConsentDetail consent);
 }

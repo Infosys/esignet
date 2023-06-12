@@ -1,5 +1,6 @@
 package io.mosip.esignet.services;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mosip.esignet.api.dto.ClaimDetail;
 import io.mosip.esignet.api.dto.Claims;
 import io.mosip.esignet.api.exception.KycAuthException;
@@ -15,6 +16,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,8 +39,14 @@ public class ConsentHelperServiceTest {
     @Mock
     KafkaHelperService kafkaHelperService;
 
+    @Mock
+    PasswordEncoder passwordEncoder;
+
     @InjectMocks
     ConsentHelperService consentHelperService;
+
+    @Autowired
+    ObjectMapper objectMapper;
 
 
     @Test
@@ -288,4 +298,33 @@ public class ConsentHelperServiceTest {
 
     }
 
+    @Test
+    public void hashedUserConsent_thenPass() throws Exception
+    {
+        Claims claims = new Claims();
+        Map<String, ClaimDetail> userinfo = new HashMap<>();
+        Map<String, ClaimDetail> id_token = new HashMap<>();
+        ClaimDetail userinfoClaimDetail = new ClaimDetail("name", new String[]{"kaif", "saif"}, true);
+        ClaimDetail userinfoClaimDetail2 = new ClaimDetail("address", new String[]{"sanf", "zaid"}, true);
+        ClaimDetail userinfoClaimDetail3 = new ClaimDetail("street", new String[]{"hamza", "meme"}, true);
+        ClaimDetail idTokenClaimDetail = new ClaimDetail("email", new String[]{"k@gmail.com", "s@gmail.com"}, false);
+        userinfo.put("name", userinfoClaimDetail);
+        userinfo.put("address",userinfoClaimDetail2);
+        userinfo.put("street",userinfoClaimDetail3);
+        id_token.put("email", idTokenClaimDetail);
+        claims.setUserinfo(userinfo);
+        claims.setId_token(id_token);
+
+        Map<String,Boolean> authorizeScope=new HashMap<>();
+        authorizeScope.put("profile",true);
+        authorizeScope.put("phone",true);
+        authorizeScope.put("attendence",false);
+
+
+        consentHelperService.hashedUserConsent(claims,authorizeScope);
+
+    }
+
 }
+
+

@@ -9,8 +9,10 @@ import io.mosip.esignet.core.dto.UserConsent;
 import io.mosip.esignet.core.dto.UserConsentRequest;
 import io.mosip.esignet.core.spi.ConsentService;
 import io.mosip.esignet.core.util.AuditHelper;
+import io.mosip.esignet.entity.ConsentHistory;
 import io.mosip.esignet.mapper.ConsentMapper;
 import io.mosip.esignet.mapper.ConsentMapperImpl;
+import io.mosip.esignet.repository.ConsentHistoryRepository;
 import io.mosip.esignet.repository.ConsentRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +31,9 @@ public class ConsentServiceImpl implements ConsentService {
     private  ConsentRepository consentRepository;
 
     @Autowired
+    private ConsentHistoryRepository consentHistoryRepository;
+
+    @Autowired
     private AuditPlugin auditWrapper;
 
     ConsentMapper consentMapper=new ConsentMapperImpl();
@@ -40,7 +45,7 @@ public class ConsentServiceImpl implements ConsentService {
     public Optional<ConsentDetail> getUserConsent(UserConsentRequest userConsentRequest) {
 
         Optional<io.mosip.esignet.entity.ConsentDetail> consentOptional = consentRepository.
-                findFirstByClientIdAndPsuToken(userConsentRequest.getClientId(),
+                findByClientIdAndPsuToken(userConsentRequest.getClientId(),
                         userConsentRequest.getPsuToken());
         if (consentOptional.isPresent()) {
             ConsentDetail consentDetailDto = consentMapper.toDto( consentOptional.get());
@@ -55,9 +60,16 @@ public class ConsentServiceImpl implements ConsentService {
 
     @Override
     public ConsentDetail saveUserConsent(UserConsent userConsent) {
+
+        Optional<io.mosip.esignet.entity.ConsentDetail> ClientDetailOptional =
+                consentRepository.findByClientIdAndPsuToken(userConsent.getClientId(), userConsent.getPsuToken());
+        if(ClientDetailOptional.isPresent()) {
+            consentRepository.deleteByClientIdAndPsuToken(userConsent.getClientId(), userConsent.getPsuToken());
+        }
         //convert ConsentRequest to Entity
         io.mosip.esignet.entity.ConsentDetail consentDetail =consentMapper.toEntity(userConsent);
-
+        ConsentHistory consentHistory = consentMapper.toConsentHistoryEntity(userConsent);
+        consentHistoryRepository.save(consentHistory);
         log.info("ConsentDetail:----------------------------- "+consentDetail.toString());
         consentDetail.setCreatedtimes(LocalDateTime.now());
         ConsentDetail consentDetailDto =consentMapper.toDto(consentRepository.save(consentDetail));

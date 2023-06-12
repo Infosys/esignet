@@ -44,6 +44,9 @@ public class ConsentDetail {
     @Column(name = "expire_dtimes")
     private LocalDateTime expiredtimes;
 
+    @Column(name = "hash")
+    private String hash;
+
     @Column(name = "signature")
     private String signature;
 

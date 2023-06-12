@@ -49,6 +49,9 @@ public class PublicKeyRegistryRepositoryTest {
 		publicKeyRegistryRepository.flush();
 		Assert.assertNotNull(publicKeyRegistry);
 
+		Optional<PublicKeyRegistry> publicKeyRegistryOptional=publicKeyRegistryRepository.findByPsuToken("test_token");
+		Assert.assertTrue(publicKeyRegistryOptional.isPresent());
+
 		List<PublicKeyRegistry> list = publicKeyRegistryRepository.findByIdHashAndAuthFactorInAndExpiredtimesGreaterThan("test_id_hash",
 				Set.of("WLA"), LocalDateTime.now());
 		Assert.assertFalse(list.isEmpty());

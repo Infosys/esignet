@@ -28,6 +28,8 @@ public interface PublicKeyRegistryRepository extends JpaRepository<PublicKeyRegi
 
     Optional<PublicKeyRegistry> findOptionalByPublicKeyHashAndPsuTokenNot(String publicKeyHash, String psuToken);
 
+	Optional<PublicKeyRegistry> findByPsuToken(String psuToken);
+
 	@Modifying
 	@Query("UPDATE PublicKeyRegistry  pkr set pkr.publicKey= :publicKey , pkr.publicKeyHash= :publicKeyHash , pkr.expiredtimes= :expireDTimes, " +
 			"pkr.certificate= :certificate where pkr.psuToken= :psuToken and pkr.authFactor= :authFactor")

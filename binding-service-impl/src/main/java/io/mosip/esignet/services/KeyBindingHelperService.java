@@ -89,9 +89,4 @@ public class KeyBindingHelperService {
         }
         return b64Encode(messageDigest.digest());
     }
-
-    public String getPublicKey(String psuToken){
-        return publicKeyRegistryRepository.findByPsuToken(psuToken).get().getPublicKey();
-    }
-
 }

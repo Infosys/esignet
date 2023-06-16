@@ -3,7 +3,6 @@ package io.mosip.esignet.services;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mosip.esignet.api.dto.ClaimDetail;
 import io.mosip.esignet.api.dto.Claims;
-import io.mosip.esignet.api.exception.KycAuthException;
 import io.mosip.esignet.core.dto.*;
 import io.mosip.esignet.core.exception.InvalidTransactionException;
 import io.mosip.esignet.core.spi.ConsentService;
@@ -23,6 +22,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RunWith(MockitoJUnitRunner.class)
 @Slf4j
@@ -76,6 +76,7 @@ public class ConsentHelperServiceTest {
         Mockito.when(consentService.saveUserConsent(Mockito.any())).thenReturn(new ConsentDetail());
 
         consentHelperService.addUserConsent("123", true, null);
+
     }
 
     @Test
@@ -120,7 +121,7 @@ public class ConsentHelperServiceTest {
     }
 
     @Test
-    public void processLinkedConsent_withValidDetails_thenPass(){
+    public void processLinkedConsent_withValidDetailsAndConsentActionAsNoCapture_thenPass(){
 
         OIDCTransaction oidcTransaction = new OIDCTransaction();
         oidcTransaction.setAuthTransactionId("123");
@@ -163,6 +164,81 @@ public class ConsentHelperServiceTest {
         LinkedKycAuthResponseV2 linkedKycAuthResponseV2 = consentHelperService.processLinkedConsent("123");
         Assert.assertNotNull(linkedKycAuthResponseV2);
 
+        List<String> acceptedClaims = consentDetail.getClaims().getUserinfo().entrySet().stream().
+                filter(entry -> entry != null && entry.getValue() != null && entry.getValue().isAccepted())
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+        List<String> permittedScopes = consentDetail.getAuthorizationScopes().entrySet().stream()
+                .filter(Map.Entry::getValue)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+
+        Assert.assertEquals(oidcTransaction.getAcceptedClaims(),acceptedClaims);
+        Assert.assertEquals(oidcTransaction.getPermittedScopes(),permittedScopes);
+        Assert.assertEquals(oidcTransaction.getConsentAction(),ConsentAction.NOCAPTURE);
+        Assert.assertEquals(linkedKycAuthResponseV2.getLinkedTransactionId(),oidcTransaction.getAuthTransactionId());
+        Assert.assertEquals(linkedKycAuthResponseV2.getConsentAction(),oidcTransaction.getConsentAction());
+
+
+    }
+
+    @Test
+    public void processLinkedConsent_withValidDetailsAndConsentActionAsCapture_thenPass(){
+
+        OIDCTransaction oidcTransaction = new OIDCTransaction();
+        oidcTransaction.setAuthTransactionId("123");
+        oidcTransaction.setClientId("123");
+        oidcTransaction.setPartnerSpecificUserToken("123");
+        oidcTransaction.setAcceptedClaims(List.of("name","email"));
+        oidcTransaction.setPermittedScopes(null);
+        oidcTransaction.setConsentAction(ConsentAction.CAPTURE);
+        oidcTransaction.setRequestedAuthorizeScopes(List.of("openid","profile"));
+
+        Claims claims = new Claims();
+        Map<String, ClaimDetail> userinfo = new HashMap<>();
+        Map<String, ClaimDetail> id_token = new HashMap<>();
+        ClaimDetail userinfoClaimDetail = new ClaimDetail("value1", new String[]{"value1a", "value1b"}, true);
+        ClaimDetail idTokenClaimDetail = new ClaimDetail("value2", new String[]{"value2a", "value2b"}, false);
+        userinfo.put("userinfoKey", userinfoClaimDetail);
+        id_token.put("idTokenKey", idTokenClaimDetail);
+        claims.setUserinfo(userinfo);
+        claims.setId_token(id_token);
+
+        oidcTransaction.setRequestedClaims(claims);
+
+        Mockito.when(cacheUtilService.getLinkedAuthTransaction(Mockito.anyString())).thenReturn(oidcTransaction);
+
+        UserConsentRequest userConsentRequest = new UserConsentRequest();
+        userConsentRequest.setClientId(oidcTransaction.getClientId());
+        userConsentRequest.setPsuToken(oidcTransaction.getPartnerSpecificUserToken());
+
+        ConsentDetail consentDetail = new ConsentDetail();
+        consentDetail.setClientId("123");
+        consentDetail.setSignature("signature");
+        consentDetail.setAuthorizationScopes(Map.of("openid",true,"profile",true));
+
+        Claims consentClaims = new Claims();
+        userinfo = new HashMap<>();
+        id_token = new HashMap<>();
+        userinfoClaimDetail = new ClaimDetail("gender", new String[]{"value1a", "value1b"}, false);
+        idTokenClaimDetail = new ClaimDetail("token", new String[]{"value1a", "value2b"}, false);
+        userinfo.put("gender", userinfoClaimDetail);
+        userinfo.put("email",null);
+        id_token.put("idTokenKey", idTokenClaimDetail);
+        consentClaims.setUserinfo(userinfo);
+        consentClaims.setId_token(id_token);
+
+        consentDetail.setClaims(consentClaims);
+
+        Mockito.when(consentService.getUserConsent(userConsentRequest)).thenReturn(Optional.of(consentDetail));
+
+        Mockito.when(cacheUtilService.setLinkedAuthenticatedTransaction(Mockito.anyString(),Mockito.any(OIDCTransaction.class))).
+                thenReturn(oidcTransaction);
+
+        LinkedKycAuthResponseV2 linkedKycAuthResponseV2 = consentHelperService.processLinkedConsent("123");
+
+        Assert.assertNotNull(linkedKycAuthResponseV2);
+        Assert.assertEquals(oidcTransaction.getConsentAction(),ConsentAction.CAPTURE);
         Assert.assertEquals(linkedKycAuthResponseV2.getLinkedTransactionId(),oidcTransaction.getAuthTransactionId());
         Assert.assertEquals(linkedKycAuthResponseV2.getConsentAction(),oidcTransaction.getConsentAction());
 
@@ -202,7 +278,7 @@ public class ConsentHelperServiceTest {
 
         LinkedKycAuthResponseV2 linkedKycAuthResponseV2 = consentHelperService.processLinkedConsent("123");
         Assert.assertNotNull(linkedKycAuthResponseV2);
-
+        Assert.assertEquals(oidcTransaction.getConsentAction(),ConsentAction.CAPTURE);
         Assert.assertEquals(linkedKycAuthResponseV2.getLinkedTransactionId(),oidcTransaction.getAuthTransactionId());
         Assert.assertEquals(linkedKycAuthResponseV2.getConsentAction(),oidcTransaction.getConsentAction());
 
@@ -242,7 +318,7 @@ public class ConsentHelperServiceTest {
 
 
     @Test
-    public void processConsent_withValidConsent(){
+    public void processConsent_withValidConsentAndConsentActionAsNoCapture_thenPass(){
 
         OIDCTransaction oidcTransaction=new OIDCTransaction();
         oidcTransaction.setClientId("abc");
@@ -252,9 +328,10 @@ public class ConsentHelperServiceTest {
         Claims claims = new Claims();
         Map<String, ClaimDetail> userinfo = new HashMap<>();
         Map<String, ClaimDetail> id_token = new HashMap<>();
-        ClaimDetail userinfoClaimDetail = new ClaimDetail("value1", new String[]{"value1a", "value1b"}, true);
-        ClaimDetail idTokenClaimDetail = new ClaimDetail("value2", new String[]{"value2a", "value2b"}, false);
-        userinfo.put("userinfoKey", userinfoClaimDetail);
+        ClaimDetail userinfoNameClaimDetail = new ClaimDetail("name", new String[]{"value1a", "value1b"}, true);
+        ClaimDetail idTokenClaimDetail = new ClaimDetail("token", new String[]{"value2a", "value2b"}, false);
+        userinfo.put("name", userinfoNameClaimDetail);
+        userinfo.put("email",null);
         id_token.put("idTokenKey", idTokenClaimDetail);
         claims.setUserinfo(userinfo);
         claims.setId_token(id_token);
@@ -276,11 +353,76 @@ public class ConsentHelperServiceTest {
         Mockito.when(consentService.getUserConsent(userConsentRequest)).thenReturn(Optional.of(consentDetail));
 
         consentHelperService.processConsent("123");
+        List<String> acceptedClaims = consentDetail.getClaims().getUserinfo().entrySet().stream().
+                filter(entry -> entry != null && entry.getValue() != null && entry.getValue().isAccepted())
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+        List<String> permittedScopes = consentDetail.getAuthorizationScopes().entrySet().stream()
+                .filter(Map.Entry::getValue)
+                .map(Map.Entry::getKey)
+                .collect(Collectors.toList());
+
+        Assert.assertEquals(oidcTransaction.getAcceptedClaims(),acceptedClaims);
+        Assert.assertEquals(oidcTransaction.getPermittedScopes(),permittedScopes);
+        Assert.assertEquals(oidcTransaction.getConsentAction(),ConsentAction.NOCAPTURE);
+        //Assert.assertTrue(oidcTransaction.getRequestedClaims().isEqualToIgnoringAccepted(consentDetail.getClaims()));
 
     }
 
     @Test
-    public void processConsent_withEmptyConsent(){
+    public void processConsent_withValidConsentAndConsentActionAsCapture_thenPass(){
+
+        OIDCTransaction oidcTransaction=new OIDCTransaction();
+        oidcTransaction.setClientId("abc");
+        oidcTransaction.setPartnerSpecificUserToken("123");
+        oidcTransaction.setRequestedAuthorizeScopes(List.of("openid","profile"));
+
+        Claims claims = new Claims();
+        Map<String, ClaimDetail> userinfo = new HashMap<>();
+        Map<String, ClaimDetail> id_token = new HashMap<>();
+        ClaimDetail userinfoNameClaimDetail = new ClaimDetail("name", new String[]{"value1a", "value1b"}, true);
+        ClaimDetail idTokenClaimDetail = new ClaimDetail("token", new String[]{"value2a", "value2b"}, false);
+        userinfo.put("name", userinfoNameClaimDetail);
+        userinfo.put("email",null);
+        id_token.put("idTokenKey", idTokenClaimDetail);
+        claims.setUserinfo(userinfo);
+        claims.setId_token(id_token);
+
+        oidcTransaction.setRequestedClaims(claims);
+
+        Mockito.when(cacheUtilService.getAuthenticatedTransaction(Mockito.anyString())).thenReturn(oidcTransaction);
+
+        UserConsentRequest userConsentRequest = new UserConsentRequest();
+        userConsentRequest.setClientId(oidcTransaction.getClientId());
+        userConsentRequest.setPsuToken(oidcTransaction.getPartnerSpecificUserToken());
+
+        ConsentDetail consentDetail = new ConsentDetail();
+        consentDetail.setClientId("123");
+        consentDetail.setSignature("signature");
+        consentDetail.setAuthorizationScopes(Map.of("openid",true,"profile",true));
+
+         Claims consentClaims = new Claims();
+         userinfo = new HashMap<>();
+         id_token = new HashMap<>();
+         userinfoNameClaimDetail = new ClaimDetail("gender", new String[]{"value1a", "value1b"}, false);
+         idTokenClaimDetail = new ClaimDetail("token", new String[]{"value1a", "value2b"}, false);
+         userinfo.put("gender", userinfoNameClaimDetail);
+         userinfo.put("email",null);
+         id_token.put("idTokenKey", idTokenClaimDetail);
+         consentClaims.setUserinfo(userinfo);
+         consentClaims.setId_token(id_token);
+
+        consentDetail.setClaims(consentClaims);
+
+        Mockito.when(consentService.getUserConsent(userConsentRequest)).thenReturn(Optional.of(consentDetail));
+        consentHelperService.processConsent("123");
+
+        Assert.assertEquals(oidcTransaction.getConsentAction(),ConsentAction.CAPTURE);
+
+    }
+
+    @Test
+    public void processConsent_withEmptyConsent_thenPass(){
 
         OIDCTransaction oidcTransaction=new OIDCTransaction();
         oidcTransaction.setClientId("abc");
@@ -295,6 +437,7 @@ public class ConsentHelperServiceTest {
         Mockito.when(consentService.getUserConsent(userConsentRequest)).thenReturn(Optional.empty());
 
         consentHelperService.processConsent("123");
+        Assert.assertEquals(oidcTransaction.getConsentAction(),ConsentAction.CAPTURE);
 
     }
 

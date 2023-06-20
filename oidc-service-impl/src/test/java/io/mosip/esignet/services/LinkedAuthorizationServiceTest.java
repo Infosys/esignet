@@ -399,6 +399,28 @@ public class LinkedAuthorizationServiceTest {
     }
 
     @Test
+    public void saveConsentV2_withValidInput_thenPass() {
+        Mockito.when(cacheUtilService.getLinkedAuthTransaction("link-transaction-id")).thenReturn(new OIDCTransaction());
+        LinkedConsentRequestV2 linkedConsentRequestV2 = new LinkedConsentRequestV2();
+        linkedConsentRequestV2.setLinkedTransactionId("link-transaction-id");
+        LinkedConsentResponse linkedConsentResponse = linkedAuthorizationService.saveConsentV2(linkedConsentRequestV2);
+        Assert.assertNotNull(linkedConsentResponse);
+        Assert.assertEquals(linkedConsentRequestV2.getLinkedTransactionId(), linkedConsentResponse.getLinkedTransactionId());
+    }
+
+    @Test
+    public void saveConsentV2_withInvalidTransaction_thenFail() {
+        LinkedConsentRequestV2 linkedConsentRequestV2 = new LinkedConsentRequestV2();
+        linkedConsentRequestV2.setLinkedTransactionId("link-transaction-id");
+        try {
+            linkedAuthorizationService.saveConsentV2(linkedConsentRequestV2);
+            Assert.fail();
+        } catch (InvalidTransactionException ex) {
+            Assert.assertEquals(ErrorConstants.INVALID_TRANSACTION, ex.getErrorCode());
+        }
+    }
+
+    @Test
     public void linkStatus_withValidInput_thenPass() {
         LinkStatusRequest linkStatusRequest = new LinkStatusRequest();
         linkStatusRequest.setLinkCode("link-code");

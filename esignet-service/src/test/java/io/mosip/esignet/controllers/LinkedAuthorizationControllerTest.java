@@ -192,6 +192,7 @@ public class LinkedAuthorizationControllerTest {
         requestWrapper.setRequest(otpRequest);
 
         OtpResponse otpResponse = new OtpResponse();
+        otpResponse.setTransactionId("transactionId");
         otpResponse.setMaskedEmail("email");
         otpResponse.setMaskedMobile("mobile");
         Mockito.when(linkedAuthorizationService.sendOtp(Mockito.any(OtpRequest.class))).thenReturn(otpResponse);
@@ -199,7 +200,7 @@ public class LinkedAuthorizationControllerTest {
         mockMvc.perform(post("/linked-authorization/send-otp")
                         .content(objectMapper.writeValueAsString(requestWrapper))
                         .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk());
+                        .andExpect(status().isOk());
 
     }
 

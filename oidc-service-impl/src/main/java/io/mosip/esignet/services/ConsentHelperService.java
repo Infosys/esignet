@@ -8,11 +8,11 @@ package io.mosip.esignet.services;
 import com.auth0.jwt.interfaces.Claim;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nimbusds.jose.JWSAlgorithm;
-import com.nimbusds.jose.JWSHeader;
-import com.nimbusds.jose.JWSObject;
+import com.nimbusds.jose.*;
+import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jose.util.Base64URL;
 import com.nimbusds.jwt.JWTClaimsSet;
+import com.nimbusds.jwt.SignedJWT;
 import io.mosip.esignet.api.dto.ClaimDetail;
 import io.mosip.esignet.api.dto.Claims;
 import io.mosip.esignet.api.util.ConsentAction;
@@ -28,6 +28,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
+import java.security.PublicKey;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.X509EncodedKeySpec;
 import java.text.ParseException;
 import java.util.*;
 import java.util.function.Function;
@@ -40,6 +46,10 @@ import static io.mosip.esignet.core.util.IdentityProviderUtil.ALGO_SHA3_256;
 public class ConsentHelperService {
     @Autowired
     private ConsentService consentService;
+
+    @Autowired
+    KeyBindingHelperService keyBindingHelperService;
+
     public void processConsent(OIDCTransaction transaction, boolean linked) {
         UserConsentRequest userConsentRequest = new UserConsentRequest();
         userConsentRequest.setClientId(transaction.getClientId());
@@ -160,6 +170,8 @@ public class ConsentHelperService {
         return consentDetail.getHash().equals(hash) ? ConsentAction.NOCAPTURE : ConsentAction.CAPTURE;
     }
 
+
+
     private String generateSignedObject(ConsentDetail consentDetail) throws ParseException {
         List<String> acceptedClaims = consentDetail.getAcceptedClaims();
         List<String> permittedScopes = consentDetail.getPermittedScopes();
@@ -180,4 +192,28 @@ public class ConsentHelperService {
                     ,Base64URL.encode(signature) );
         return jwsObject == null ? "": jwsObject.serialize();
     }
+
+    private boolean validateSignature(OIDCTransaction transaction, ConsentDetail consentDetail) throws ParseException, JOSEException, NoSuchAlgorithmException, InvalidKeySpecException, JOSEException {
+        String jwtToken = generateSignedObject(consentDetail);
+        SignedJWT signedJWT = SignedJWT.parse(jwtToken);
+        String thumbPrint="";
+        String publicKey = keyBindingHelperService.getPublicKey(consentDetail.getPsuToken(),thumbPrint);
+        byte[] publicKeyBytes = Base64.getDecoder().decode(publicKey);
+        X509EncodedKeySpec keySpec = new X509EncodedKeySpec(publicKeyBytes);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        PublicKey publickey = keyFactory.generatePublic(keySpec);
+        JWSVerifier verifier = new RSASSAVerifier((RSAPublicKey) publickey);
+        if (signedJWT.verify(verifier)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    public String getPublicKey(String pusToken,String thumbPrint)
+    {
+        return keyBindingHelperService.getPublicKey(pusToken,thumbPrint);
+    }
+
+
 }

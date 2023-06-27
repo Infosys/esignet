@@ -54,6 +54,10 @@ public class PublicKeyRegistry {
 	private String publicKeyHash;
 
 	@NotBlank
+	@Column(name = "thumb_print")
+	private String thumbPrint;
+
+	@NotBlank
 	@Column(name = "certificate")
 	private String certificate;
 

@@ -89,4 +89,12 @@ public class KeyBindingHelperService {
         }
         return b64Encode(messageDigest.digest());
     }
+
+    public String getPublicKey(String psuToken,String thumbPrint) {
+        Optional<PublicKeyRegistry> publicKeyRegistryOptional= publicKeyRegistryRepository.findByPsuTokenAndThumbPrint(psuToken,thumbPrint);
+        if(publicKeyRegistryOptional.isPresent()){
+            return  publicKeyRegistryOptional.get().getPublicKey();
+        }
+        return null;
+    }
 }

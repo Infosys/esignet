@@ -83,19 +83,23 @@ public class HeaderValidationFilter extends OncePerRequestFilter {
         try {
             log.debug("Started to validate {} for oauth-details headers", path);
             final String transactionId = request.getHeader(HEADER_OAUTH_DETAILS_KEY);
-            final String hashValue = request.getHeader(HEADER_OAUTH_DETAILS_HASH);
+ //           final String hashValue = request.getHeader(HEADER_OAUTH_DETAILS_HASH);
             OIDCTransaction transaction = getTransaction(transactionId, path);
             if(transaction == null) {
                 throw new InvalidTransactionException();
             }
 
-            if(transaction.getOauthDetailsHash().equals(hashValue)) {
+            validateApiRateLimits(path, transactionId, transaction.getIndividualIdHash());
+            filterChain.doFilter(request, response);
+
+            // TODO Implement logic to compare the hash value and throw an error if it does not match
+            /*if(transaction.getOauthDetailsHash().equals(hashValue)) {
                 validateApiRateLimits(path, transactionId, transaction.getIndividualIdHash());
                 filterChain.doFilter(request, response);
                 return;
             }
             log.error("oauth-details header validation failed, value in transaction: {}", transaction.getOauthDetailsHash());
-            throw new EsignetException(INVALID_REQUEST);
+            throw new EsignetException(INVALID_REQUEST);*/
 
         } catch (EsignetException e) {
             response.setStatus(HttpStatus.OK.value());

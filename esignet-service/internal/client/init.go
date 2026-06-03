@@ -39,6 +39,13 @@ func NewModule(
 		SupportedClientAuthMethods: supported.ClientAuthMethods,
 		SupportedIDRegex:           cfg.SupportedIDRegex,
 	}
+	log.Info("[client] FINAL validator config — these are the lists every create request will be checked against",
+		applog.Any("user_claims", validatorCfg.SupportedUserClaims),
+		applog.Any("acr_values", validatorCfg.SupportedACRValues),
+		applog.Any("grant_types", validatorCfg.SupportedGrantTypes),
+		applog.Any("auth_methods", validatorCfg.SupportedClientAuthMethods),
+		applog.String("id_regex", validatorCfg.SupportedIDRegex),
+	)
 
 	val, err := buildValidatorForConfig(ctx, validatorCfg, cfg.AdditionalConfigSchemaURL, log)
 	if err != nil {

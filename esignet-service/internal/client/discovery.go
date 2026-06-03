@@ -58,14 +58,24 @@ func DefaultSupportedLists() SupportedLists {
 // decode error, empty arrays) it logs a WARN and returns the baked-in
 // defaults so the service stays bootable.
 func DiscoverSupportedLists(mux *http.ServeMux, log *applog.Logger) SupportedLists {
+	log.Info("[discovery] STEP 1 — dispatching in-process request",
+		applog.String("path", wellKnownPath),
+		applog.String("method", http.MethodGet),
+	)
+
 	req := httptest.NewRequest(http.MethodGet, wellKnownPath, nil)
 	w := httptest.NewRecorder()
 	mux.ServeHTTP(w, req)
 
+	log.Info("[discovery] STEP 2 — got response from mux",
+		applog.Int("status", w.Code),
+		applog.Int("body_bytes", w.Body.Len()),
+	)
+
 	if w.Code != http.StatusOK {
-		log.Warn("well-known discovery returned non-200, using defaults",
+		log.Warn("[discovery] DECISION — non-200 status, falling back to DefaultSupportedLists()",
 			applog.Int("status", w.Code))
-		return DefaultSupportedLists()
+		return logAndReturnDefaults(log, "non-200")
 	}
 
 	var doc struct {
@@ -75,24 +85,32 @@ func DiscoverSupportedLists(mux *http.ServeMux, log *applog.Logger) SupportedLis
 		TokenEndpointAuthMethodsSupported []string `json:"token_endpoint_auth_methods_supported"`
 	}
 	if err := json.NewDecoder(w.Body).Decode(&doc); err != nil {
-		log.Warn("well-known decode failed, using defaults", applog.Error(err))
-		return DefaultSupportedLists()
+		log.Warn("[discovery] DECISION — JSON decode failed, falling back to DefaultSupportedLists()",
+			applog.Error(err))
+		return logAndReturnDefaults(log, "decode-failed")
 	}
+
+	log.Info("[discovery] STEP 3 — parsed well-known JSON, per-field presence:",
+		applog.Int("claims_supported", len(doc.ClaimsSupported)),
+		applog.Int("acr_values_supported", len(doc.AcrValuesSupported)),
+		applog.Int("grant_types_supported", len(doc.GrantTypesSupported)),
+		applog.Int("token_endpoint_auth_methods_supported", len(doc.TokenEndpointAuthMethodsSupported)),
+	)
 
 	// Valid JSON but empty enum lists would make every schema validation
 	// fail (no claim/ACR/grant/auth-method would be acceptable). Treat as
 	// a misconfiguration and fall back.
 	if len(doc.ClaimsSupported) == 0 || len(doc.AcrValuesSupported) == 0 ||
 		len(doc.GrantTypesSupported) == 0 || len(doc.TokenEndpointAuthMethodsSupported) == 0 {
-		log.Warn("well-known returned empty supported lists, using defaults")
-		return DefaultSupportedLists()
+		log.Warn("[discovery] DECISION — one or more fields missing/empty, falling back to DefaultSupportedLists()")
+		return logAndReturnDefaults(log, "empty-fields")
 	}
 
-	log.Info("supported lists loaded from engine /.well-known",
-		applog.Int("user_claims", len(doc.ClaimsSupported)),
-		applog.Int("acr_values", len(doc.AcrValuesSupported)),
-		applog.Int("grant_types", len(doc.GrantTypesSupported)),
-		applog.Int("auth_methods", len(doc.TokenEndpointAuthMethodsSupported)),
+	log.Info("[discovery] DECISION — engine values accepted; using engine-sourced lists",
+		applog.Any("user_claims", doc.ClaimsSupported),
+		applog.Any("acr_values", doc.AcrValuesSupported),
+		applog.Any("grant_types", doc.GrantTypesSupported),
+		applog.Any("auth_methods", doc.TokenEndpointAuthMethodsSupported),
 	)
 	return SupportedLists{
 		UserClaims:        doc.ClaimsSupported,
@@ -100,4 +118,19 @@ func DiscoverSupportedLists(mux *http.ServeMux, log *applog.Logger) SupportedLis
 		GrantTypes:        doc.GrantTypesSupported,
 		ClientAuthMethods: doc.TokenEndpointAuthMethodsSupported,
 	}
+}
+
+// logAndReturnDefaults prints the actual default lists that get baked into
+// the schema, so an operator can compare them against the engine's published
+// values when a fallback kicks in.
+func logAndReturnDefaults(log *applog.Logger, reason string) SupportedLists {
+	d := DefaultSupportedLists()
+	log.Info("[discovery] using baked-in DefaultSupportedLists()",
+		applog.String("reason", reason),
+		applog.Any("user_claims", d.UserClaims),
+		applog.Any("acr_values", d.ACRValues),
+		applog.Any("grant_types", d.GrantTypes),
+		applog.Any("auth_methods", d.ClientAuthMethods),
+	)
+	return d
 }

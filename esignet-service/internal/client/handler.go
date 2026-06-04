@@ -66,15 +66,10 @@ func ClientMgmtCreate(
 			return
 		}
 
-		log.Info("[handler] received create request — about to run schema validation against the COMPILED schema (lists were baked in at startup; see [client] FINAL validator config log)")
 		if codes := val.ValidateCreate(rawDoc); len(codes) > 0 {
-			log.Info("[handler] validation FAILED",
-				applog.Any("wire_codes", codes),
-			)
 			writeEnvelope(w, log, newCreateErrorEnvelope(codes...))
 			return
 		}
-		log.Info("[handler] validation PASSED")
 
 		var env createRequestEnvelope
 		if err := json.Unmarshal(rawBytes, &env); err != nil {

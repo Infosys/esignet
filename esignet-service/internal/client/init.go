@@ -18,34 +18,24 @@ type Module struct {
 }
 
 // NewModule wires the validator and service against a repository built
-// from the supplied pool. The supplied mux is used in read-only mode for
-// in-process discovery of the engine's /.well-known document; the actual
-// route registration happens later in (*Module).Initialize.
+// from the supplied pool. Supported-list enum values (claims, ACRs,
+// grant types, auth methods) are taken from cfg — these are operator
+// policy, sourced via env vars matching Java esignet's property pattern.
 //
-// Fails fast on validator-load errors. Discovery itself never fails — it
-// falls back to baked-in OIDC/RFC defaults when /.well-known is unreachable.
+// Fails fast on validator-load errors.
 func NewModule(
 	ctx context.Context,
 	cfg Config,
 	pool *pgxpool.Pool,
-	mux *http.ServeMux,
 	log *applog.Logger,
 ) (*Module, error) {
-	supported := DiscoverSupportedLists(mux, log)
 	validatorCfg := ClientValidatorConfig{
-		SupportedUserClaims:        supported.UserClaims,
-		SupportedACRValues:         supported.ACRValues,
-		SupportedGrantTypes:        supported.GrantTypes,
-		SupportedClientAuthMethods: supported.ClientAuthMethods,
+		SupportedUserClaims:        cfg.SupportedUserClaims,
+		SupportedACRValues:         cfg.SupportedACRValues,
+		SupportedGrantTypes:        cfg.SupportedGrantTypes,
+		SupportedClientAuthMethods: cfg.SupportedClientAuthMethods,
 		SupportedIDRegex:           cfg.SupportedIDRegex,
 	}
-	log.Info("[client] FINAL validator config — these are the lists every create request will be checked against",
-		applog.Any("user_claims", validatorCfg.SupportedUserClaims),
-		applog.Any("acr_values", validatorCfg.SupportedACRValues),
-		applog.Any("grant_types", validatorCfg.SupportedGrantTypes),
-		applog.Any("auth_methods", validatorCfg.SupportedClientAuthMethods),
-		applog.String("id_regex", validatorCfg.SupportedIDRegex),
-	)
 
 	val, err := buildValidatorForConfig(ctx, validatorCfg, cfg.AdditionalConfigSchemaURL, log)
 	if err != nil {

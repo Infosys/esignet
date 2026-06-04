@@ -88,7 +88,7 @@ func main() {
 		logger.Fatal("initialize engine", applog.Error(err))
 	}
 
-	clientMod, err := client.NewModule(ctx, clientCfg, dbPool, mux, logger)
+	clientMod, err := client.NewModule(ctx, clientCfg, dbPool, logger)
 	if err != nil {
 		logger.Fatal("client module", applog.Error(err))
 	}

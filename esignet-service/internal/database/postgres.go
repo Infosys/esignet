@@ -6,6 +6,7 @@ package database
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,10 +15,20 @@ import (
 )
 
 // Config bundles every operator-controlled knob for the Postgres pool.
-// Values originate from envconfig in the consumer package; this struct
-// stays free of env-tag annotations so it remains library-shaped.
+// Fields mirror the MOSIP helm chart's existing env vars
+// (DATABASE_HOST / DATABASE_PORT / DATABASE_NAME / DATABASE_USERNAME /
+// DB_DBUSER_PASSWORD) so the chart works for this service with no
+// changes; the existing postgres-config ConfigMap and db-common-secrets
+// Secret on every MOSIP cluster supply the values.
 type Config struct {
-	URL             string
+	Host     string
+	Port     string
+	Name     string
+	Username string
+	Password string
+	SSLMode  string // disable | require | verify-ca | verify-full
+	Schema   string // optional Postgres search_path
+
 	MaxConns        int32
 	MinConns        int32
 	MaxConnLifetime time.Duration
@@ -25,10 +36,44 @@ type Config struct {
 	HealthTimeout   time.Duration
 }
 
+// ConnString assembles the libpq-style connection URL from the discrete
+// fields. Password is URL-escaped so special characters survive (`@`,
+// `#`, `%`, etc. in production-rotated passwords would otherwise break
+// the URL parser).
+//
+// The returned string includes the password and MUST NOT be logged. Use
+// (Config).Redacted for that.
+func (c Config) ConnString() string {
+	u := url.URL{
+		Scheme: "postgres",
+		User:   url.UserPassword(c.Username, c.Password),
+		Host:   fmt.Sprintf("%s:%s", c.Host, c.Port),
+		Path:   "/" + c.Name,
+	}
+	q := url.Values{}
+	if c.SSLMode != "" {
+		q.Set("sslmode", c.SSLMode)
+	}
+	if c.Schema != "" {
+		q.Set("search_path", c.Schema)
+	}
+	u.RawQuery = q.Encode()
+	return u.String()
+}
+
+// Redacted returns a log-safe representation of the config with the
+// password masked. Use this in startup logs instead of ConnString.
+func (c Config) Redacted() string {
+	return fmt.Sprintf("postgres://%s:****@%s:%s/%s?sslmode=%s&search_path=%s",
+		c.Username, c.Host, c.Port, c.Name, c.SSLMode, c.Schema)
+}
+
 // NewPool opens a pgxpool, pings it once, and returns it ready for use.
 // Caller owns the lifecycle; defer pool.Close() in main.
 func NewPool(ctx context.Context, cfg Config, log *applog.Logger) (*pgxpool.Pool, error) {
-	pc, err := pgxpool.ParseConfig(cfg.URL)
+	log.Info("postgres: opening pool", applog.String("conn", cfg.Redacted()))
+
+	pc, err := pgxpool.ParseConfig(cfg.ConnString())
 	if err != nil {
 		return nil, fmt.Errorf("parse db url: %w", err)
 	}
@@ -57,7 +102,7 @@ func NewPool(ctx context.Context, cfg Config, log *applog.Logger) (*pgxpool.Pool
 		return nil, fmt.Errorf("db ping: %w", err)
 	}
 
-	log.Info("postgres pool ready",
+	log.Info("postgres: pool ready",
 		applog.Int("max_conns", int(pc.MaxConns)),
 		applog.Int("min_conns", int(pc.MinConns)),
 	)

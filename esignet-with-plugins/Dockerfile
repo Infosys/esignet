@@ -1,4 +1,4 @@
-FROM mosipdev/esignet:develop
+FROM eclipse-temurin:21-jre
 
 ARG SOURCE
 ARG COMMIT_HASH

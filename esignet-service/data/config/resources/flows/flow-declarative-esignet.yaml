@@ -143,7 +143,7 @@ submit_button: &submit_button
 trigger_button: &trigger_button
   <<: *submit_button
   variant: OUTLINE
-  eventType: TRIGGER
+  eventType: RESET
 
 # Anchor for title for the page
 page_title: &page_title
@@ -153,6 +153,15 @@ page_title: &page_title
   align: left
   variant: HEADING_5
   category: DISPLAY
+  resourceType: ELEMENT
+
+# Anchor for title for the page with back button
+page_title_with_back: &page_title_with_back
+  id: BACK_BUTTON
+  ref: back_button
+  type: CUSTOM
+  label: Select a Login ID Option
+  category: MISCELLANEOUS
   resourceType: ELEMENT
 
 # Anchor for multiple login ids
@@ -245,8 +254,7 @@ nodes:
         - type: BLOCK
           id: block_otp
           components:
-            - <<: *page_title
-              id: title_otp
+            - *page_title_with_back
             - *login_ids
             - *prompt_uin
             - <<: *submit_button
@@ -270,6 +278,9 @@ nodes:
       - action:
           ref: login_id_nrc
           nextNode: prompt_nrc_otp
+      - action:
+          ref: BACK_BUTTON
+          nextNode: prompt_acr
 
   - id: prompt_mobile_otp
     type: PROMPT
@@ -279,8 +290,7 @@ nodes:
         - type: BLOCK
           id: block_otp
           components:
-            - <<: *page_title
-              id: title_otp
+            - *page_title_with_back
             - *login_ids
             - *prompt_mobile
             - <<: *submit_button
@@ -304,6 +314,9 @@ nodes:
       - action:
           ref: login_id_nrc
           nextNode: prompt_nrc_otp
+      - action:
+          ref: BACK_BUTTON
+          nextNode: prompt_acr
 
   - id: prompt_email_otp
     type: PROMPT
@@ -313,8 +326,7 @@ nodes:
         - type: BLOCK
           id: block_otp
           components:
-            - <<: *page_title
-              id: title_otp
+            - *page_title_with_back
             - *login_ids
             - *prompt_email
             - <<: *submit_button
@@ -338,6 +350,9 @@ nodes:
       - action:
           ref: login_id_nrc
           nextNode: prompt_nrc_otp
+      - action:
+          ref: BACK_BUTTON
+          nextNode: prompt_acr
 
   - id: prompt_nrc_otp
     type: PROMPT
@@ -347,8 +362,7 @@ nodes:
         - type: BLOCK
           id: block_otp
           components:
-            - <<: *page_title
-              id: title_otp
+            - *page_title_with_back
             - *login_ids
             - *prompt_nrc
             - <<: *submit_button
@@ -372,6 +386,9 @@ nodes:
       - action:
           ref: login_id_email
           nextNode: prompt_email_otp
+      - action:
+          ref: BACK_BUTTON
+          nextNode: prompt_acr
 
   - id: send_mosip_otp
     type: TASK_EXECUTION
@@ -451,8 +468,7 @@ nodes:
           type: BLOCK
           category: BLOCK
           components:
-            - <<: *page_title
-              id: title_credentials
+            - *page_title_with_back
             - *login_ids
             - *prompt_uin
             - *prompt_password
@@ -481,6 +497,9 @@ nodes:
       - action:
           ref: login_id_nrc
           nextNode: prompt_nrc_credentials
+      - action:
+          ref: BACK_BUTTON
+          nextNode: prompt_acr
 
   - id: prompt_mobile_credentials
     type: PROMPT
@@ -492,8 +511,7 @@ nodes:
           type: BLOCK
           category: BLOCK
           components:
-            - <<: *page_title
-              id: title_credentials
+            - *page_title_with_back
             - *login_ids
             - *prompt_mobile
             - *prompt_password
@@ -522,6 +540,9 @@ nodes:
       - action:
           ref: login_id_nrc
           nextNode: prompt_nrc_credentials
+      - action:
+          ref: BACK_BUTTON
+          nextNode: prompt_acr
 
   - id: prompt_email_credentials
     type: PROMPT
@@ -533,8 +554,7 @@ nodes:
           type: BLOCK
           category: BLOCK
           components:
-            - <<: *page_title
-              id: title_credentials
+            - *page_title_with_back
             - *login_ids
             - *prompt_email
             - *prompt_password
@@ -563,6 +583,9 @@ nodes:
       - action:
           ref: login_id_nrc
           nextNode: prompt_nrc_credentials
+      - action:
+          ref: BACK_BUTTON
+          nextNode: prompt_acr
 
   - id: prompt_nrc_credentials
     type: PROMPT
@@ -574,8 +597,7 @@ nodes:
           type: BLOCK
           category: BLOCK
           components:
-            - <<: *page_title
-              id: title_credentials
+            - *page_title_with_back
             - *login_ids
             - *prompt_nrc
             - *prompt_password
@@ -604,6 +626,9 @@ nodes:
       - action:
           ref: login_id_email
           nextNode: prompt_email_credentials
+      - action:
+          ref: BACK_BUTTON
+          nextNode: prompt_acr
 
   - id: basic_cred_auth
     type: TASK_EXECUTION
@@ -628,8 +653,7 @@ nodes:
         - type: BLOCK
           id: block_biometrics
           components:
-            - <<: *page_title
-              id: title_biometrics
+            - *page_title_with_back
             - *login_ids
             - *prompt_uin
             - *submit_button
@@ -651,6 +675,9 @@ nodes:
       - action:
           ref: login_id_nrc
           nextNode: prompt_nrc_bio
+      - action:
+          ref: BACK_BUTTON
+          nextNode: prompt_acr
 
   - id: prompt_mobile_bio
     type: PROMPT
@@ -660,8 +687,7 @@ nodes:
         - type: BLOCK
           id: block_biometrics
           components:
-            - <<: *page_title
-              id: title_biometrics
+            - *page_title_with_back
             - *login_ids
             - *prompt_mobile
             - *submit_button
@@ -683,6 +709,9 @@ nodes:
       - action:
           ref: login_id_nrc
           nextNode: prompt_nrc_bio
+      - action:
+          ref: BACK_BUTTON
+          nextNode: prompt_acr
 
   - id: prompt_email_bio
     type: PROMPT
@@ -692,8 +721,7 @@ nodes:
         - type: BLOCK
           id: block_biometrics
           components:
-            - <<: *page_title
-              id: title_biometrics
+            - *page_title_with_back
             - *login_ids
             - *prompt_email
             - *submit_button
@@ -715,6 +743,9 @@ nodes:
       - action:
           ref: login_id_nrc
           nextNode: prompt_nrc_bio
+      - action:
+          ref: BACK_BUTTON
+          nextNode: prompt_acr
 
   - id: prompt_nrc_bio
     type: PROMPT
@@ -724,8 +755,7 @@ nodes:
         - type: BLOCK
           id: block_biometrics
           components:
-            - <<: *page_title
-              id: title_biometrics
+            - *page_title_with_back
             - *login_ids
             - *prompt_nrc
             - *submit_button
@@ -747,6 +777,9 @@ nodes:
       - action:
           ref: login_id_email
           nextNode: prompt_email_bio
+      - action:
+          ref: BACK_BUTTON
+          nextNode: prompt_acr
 
   - id: prompt_biometric
     type: PROMPT
@@ -796,8 +829,8 @@ nodes:
         - id: block_kbi
           type: BLOCK
           components:
-            - <<: *page_title
-              id: title_kbi
+            - <<: *page_title_with_back
+              id: Login with KBI
             - *prompt_uin
             - id: fullname_input
               ref: fullname
@@ -832,6 +865,9 @@ nodes:
         action:
           ref: submit_kbi_details
           nextNode: basic_kbi_auth
+      - action:
+          ref: BACK_BUTTON
+          nextNode: prompt_acr
 
   - id: basic_kbi_auth
     type: TASK_EXECUTION

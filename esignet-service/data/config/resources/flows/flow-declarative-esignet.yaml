@@ -842,7 +842,7 @@ nodes:
           type: BLOCK
           components:
             - <<: *page_title_with_back
-              id: Login with KBI
+              label: Login with KBI
             - *prompt_uin
             - id: fullname_input
               ref: fullname

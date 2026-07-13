@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import type {
   ComponentRenderContext,
   EmbeddedFlowComponent,
@@ -11,9 +10,6 @@ export default function BackButton({
   component: EmbeddedFlowComponent;
   context: ComponentRenderContext;
 }) {
-  const onInputChangeRef = useRef(context.onInputChange);
-  onInputChangeRef.current = context.onInputChange;
-
   const handleBackButtonClick = () => {
     if (context.onSubmit) {
       context.resetForm?.();
@@ -27,6 +23,7 @@ export default function BackButton({
         <div className="inline w-max mb-1">
           <button
             id="back-button"
+            type="button"
             onClick={() => handleBackButtonClick()}
             className="back-button-color cursor-pointer text-2xl font-semibold justify-left rtl:rotate-180 relative top-[2px]"
           >

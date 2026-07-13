@@ -64,15 +64,15 @@ prompt_uin: &prompt_uin
   required: true
   placeholder: Enter your UIN/VID
   validation:
+    - type: regex
+      value: ^[0-9]+$
+      message: UIN/VID must contain numbers only
     - type: maxLength
       value: 16
       message: UIN/VID must be between 10 and 16 digits
     - type: minLength
       value: 10
       message: UIN/VID must be between 10 and 16 digits
-    - type: regex
-      value: "[0-9]*"
-      message: UIN/VID must contain numbers only
 
 # Anchor for Mobile number input, with validation
 prompt_mobile: &prompt_mobile
@@ -82,16 +82,26 @@ prompt_mobile: &prompt_mobile
   label: Mobile Number
   required: true
   placeholder: Enter Mobile Number
+  postfix: "@phone"
+  prefixes:
+    - label: "+91"
+      value: "+91"
+      maxLength: 10
+      regex: ^[0-9]{10}$
+    - label: "+855"
+      value: "+855"
+      maxLength: 9
+      regex: ^[0-9]{9}$
   validation:
+    - type: regex
+      value: "[0-9]*"
+      message: Mobile Number must contain numbers only
     - type: maxLength
       value: 11
       message: Mobile Number must be between 9 and 11 digits
     - type: minLength
       value: 9
       message: Mobile Number must be between 9 and 11 digits
-    - type: regex
-      value: "[0-9]*"
-      message: Mobile Number must contain numbers only
 
 # Anchor for Email input, with validation
 prompt_email: &prompt_email
@@ -101,6 +111,7 @@ prompt_email: &prompt_email
   label: Email
   required: true
   placeholder: Enter Email ID
+  postfix: "@email"
   validation:
     - type: regex
       value: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
@@ -113,6 +124,7 @@ prompt_nrc: &prompt_nrc
   type: TEXT_INPUT
   label: NRC ID
   required: true
+  postfix: "@nrc"
   placeholder: Enter NRC ID
 
 # Anchor for Password input, with validation

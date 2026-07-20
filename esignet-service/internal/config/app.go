@@ -56,6 +56,7 @@ type AppConfig struct {
 	KeyConfig        engineconfig.KeyConfig           `yaml:"key"`
 	Consent          engineconfig.ConsentConfig       `yaml:"consent"`
 	SecurityConfig   SecurityConfig                   `yaml:"security_config"`
+	Captcha          CaptchaConfig                    `yaml:"captcha"`
 }
 
 // SecurityConfig defines application security configuration
@@ -72,6 +73,13 @@ type AuthorizationConfig struct {
 	Endpoint string `yaml:"endpoint,omitempty"`
 	Method   string `yaml:"method,omitempty"`
 	Scope    string `yaml:"scope,omitempty"`
+}
+
+// CaptchaConfig holds settings for the external captcha validation provider.
+type CaptchaConfig struct {
+	ValidatorURL string `yaml:"validator_url"`
+	ModuleName   string `yaml:"module_name"`
+	TimeoutSecs  int    `yaml:"timeout_secs"`
 }
 
 // LoadAppConfig loads the application configuration from the default data directory.
@@ -152,6 +160,24 @@ func applyDefaults(cfg *AppConfig) {
 	cfg.Flow.Store = "memory"
 	cfg.Flow.Executors = []string{"CredentialsAuthExecutor", "AuthAssertExecutor", "ConsentExecutor", "AuthorizationExecutor"}
 	cfg.Flow.Interceptors = []string{}
+
+	if v := os.Getenv("CAPTCHA_VALIDATOR_URL"); v != "" {
+		cfg.Captcha.ValidatorURL = strings.TrimSpace(v)
+	}
+	if v := os.Getenv("CAPTCHA_MODULE_NAME"); v != "" {
+		cfg.Captcha.ModuleName = strings.TrimSpace(v)
+	}
+	if v := os.Getenv("CAPTCHA_TIMEOUT_SECS"); v != "" {
+		if secs, err := strconv.Atoi(v); err == nil && secs > 0 {
+			cfg.Captcha.TimeoutSecs = secs
+		}
+	}
+	if cfg.Captcha.TimeoutSecs <= 0 {
+		cfg.Captcha.TimeoutSecs = 30
+	}
+	if strings.TrimSpace(cfg.Captcha.ValidatorURL) != "" {
+		cfg.Flow.Interceptors = append(cfg.Flow.Interceptors, "CaptchaInterceptor")
+	}
 
 	cfg.Consent.Enabled = false
 

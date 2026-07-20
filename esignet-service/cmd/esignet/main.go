@@ -22,6 +22,7 @@ import (
 	"github.com/mosip/esignet/internal/config"
 	"github.com/mosip/esignet/internal/consentmgmt"
 	"github.com/mosip/esignet/internal/engine"
+	"github.com/mosip/esignet/internal/engine/captcha"
 	"github.com/mosip/esignet/internal/engine/runtimestores/inmemory"
 	"github.com/mosip/esignet/internal/engine/runtimestores/redisstore"
 	"github.com/mosip/esignet/internal/engine/shared"
@@ -88,7 +89,7 @@ func main() {
 	// engine's stored authorization requests from it), so both resolve the same keys.
 	runtimeStore := getRuntimeStoreProvider(appCfg, redisClient, logger)
 
-	_ = thunderidengine.New(mux,
+	engineOpts := []thunderidengine.Option{
 		thunderidengine.WithServerHome(appCfg.DataDir),
 		thunderidengine.WithKeyConfigs([]engineconfig.KeyConfig{appCfg.KeyConfig}),
 		thunderidengine.WithEncryptionConfig(appCfg.EncryptionConfig),
@@ -113,7 +114,21 @@ func main() {
 		thunderidengine.WithIDPProvider(engine.NewIDPProvider(appCfg)),
 		thunderidengine.WithCustomExecutors(getCustomExecutors(authnProvider)),
 		thunderidengine.WithRuntimeStoreProvider(runtimeStore),
-	)
+	}
+
+	if appCfg.Captcha.ValidatorURL != "" {
+		cp, err := captcha.New(captcha.Config{
+			ValidatorURL: appCfg.Captcha.ValidatorURL,
+			ModuleName:   appCfg.Captcha.ModuleName,
+			TimeoutSecs:  appCfg.Captcha.TimeoutSecs,
+		})
+		if err != nil {
+			logger.Fatal("captcha provider init", applog.Error(err))
+		}
+		engineOpts = append(engineOpts, thunderidengine.WithCaptchaProvider(cp))
+	}
+
+	_ = thunderidengine.New(mux, engineOpts...)
 
 	addr := fmt.Sprintf(":%d", appCfg.Port)
 	logger.Info("server listening", applog.String("addr", addr), applog.String("issuer", appCfg.Issuer))

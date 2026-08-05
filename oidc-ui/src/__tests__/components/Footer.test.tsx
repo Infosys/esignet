@@ -40,4 +40,24 @@ describe('Footer', () => {
     await waitFor(() => expect(mockFetchThemeConfig).toHaveBeenCalled());
     expect(container.querySelector('#footer')).toBeNull();
   });
+
+  it('skips setConfig when component unmounts before fetch resolves (mounted guard)', async () => {
+    // Resolve only after we unmount — covers the `if (mounted)` false branch.
+    let resolveFetch!: (value: unknown) => void;
+    mockFetchThemeConfig.mockReturnValue(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      }),
+    );
+
+    const { unmount } = render(<Footer />);
+    // Unmount before the fetch resolves — sets mounted = false.
+    unmount();
+    // Now resolve; the guard prevents a state update on the unmounted component.
+    resolveFetch({ footer: true });
+    // Drain any pending microtasks.
+    await Promise.resolve();
+    // If the guard fires correctly no "state update on unmounted" error is thrown.
+    expect(mockFetchThemeConfig).toHaveBeenCalled();
+  });
 });

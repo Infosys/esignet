@@ -1,5 +1,26 @@
 import { describe, it, expect } from 'vitest';
-import { encodeBase64Url, decodeBase64, decodeBase64Url } from '../../utils/encoding';
+import { encodeBase64Url, encodeBase64, decodeBase64, decodeBase64Url } from '../../utils/encoding';
+
+describe('encodeBase64', () => {
+  it('encodes a string to standard base64', () => {
+    expect(encodeBase64('hello world')).toBe(btoa('hello world'));
+  });
+
+  it('encodes an empty string', () => {
+    expect(encodeBase64('')).toBe('');
+  });
+
+  it('round-trips with decodeBase64', () => {
+    const original = 'test payload 123';
+    expect(decodeBase64(encodeBase64(original))).toBe(original);
+  });
+
+  it('handles unicode characters without throwing', () => {
+    const result = encodeBase64('hello 🌍');
+    expect(typeof result).toBe('string');
+    expect(result.length).toBeGreaterThan(0);
+  });
+});
 
 describe('encoding utilities', () => {
   describe('encodeBase64Url', () => {

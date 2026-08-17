@@ -26,6 +26,7 @@ const (
 	defaultRedisReadTimeoutSecs     = 3
 	defaultRedisWriteTimeoutSecs    = 3
 	defaultRedisConnMaxLifetimeSecs = 0 // no limit
+	defaultRedisPoolTimeoutSecs     = 4 // matches go-redis default: ReadTimeout+1s
 	defaultRedisKeyPrefix           = "esignet:"
 	redisPingTimeout                = 5 * time.Second
 	defaultRedisDB                  = 0
@@ -49,6 +50,7 @@ const (
 //	REDIS_DIAL_TIMEOUT_SECS     — default 5
 //	REDIS_READ_TIMEOUT_SECS     — default 3
 //	REDIS_WRITE_TIMEOUT_SECS    — default 3
+//	REDIS_POOL_TIMEOUT_SECS     — default 4 (go-redis default: ReadTimeout+1s)
 //
 //	REDIS_KEY_PREFIX            — default "esignet:"
 //
@@ -69,6 +71,7 @@ type Redis struct {
 	DialTimeout     time.Duration
 	ReadTimeout     time.Duration
 	WriteTimeout    time.Duration
+	PoolTimeout     time.Duration
 
 	KeyPrefix string
 
@@ -121,6 +124,14 @@ func loadRedis() Redis {
 		writeTimeout = time.Duration(defaultRedisWriteTimeoutSecs) * time.Second
 	}
 
+	poolTimeoutSecs := envIntOrDefault("REDIS_POOL_TIMEOUT_SECS", defaultRedisPoolTimeoutSecs)
+	var poolTimeout time.Duration
+	if poolTimeoutSecs > 0 {
+		poolTimeout = time.Duration(poolTimeoutSecs) * time.Second
+	} else {
+		poolTimeout = time.Duration(defaultRedisPoolTimeoutSecs) * time.Second
+	}
+
 	keyPrefix := envOrDefault("REDIS_KEY_PREFIX", defaultRedisKeyPrefix)
 
 	sentinelAddrsRaw := envOrDefault("REDIS_SENTINEL_ADDRS", "")
@@ -147,6 +158,7 @@ func loadRedis() Redis {
 		DialTimeout:     dialTimeout,
 		ReadTimeout:     readTimeout,
 		WriteTimeout:    writeTimeout,
+		PoolTimeout:     poolTimeout,
 		KeyPrefix:       keyPrefix,
 		SentinelMaster:  envOrDefault("REDIS_SENTINEL_MASTER", ""),
 		SentinelAddrs:   sentinelAddrs,
@@ -198,6 +210,7 @@ func (r Redis) newClient() (*redis.Client, error) {
 			DialTimeout:     r.DialTimeout,
 			ReadTimeout:     r.ReadTimeout,
 			WriteTimeout:    r.WriteTimeout,
+			PoolTimeout:     r.PoolTimeout,
 		}
 		if r.TLS {
 			opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
@@ -217,6 +230,7 @@ func (r Redis) newClient() (*redis.Client, error) {
 		DialTimeout:     r.DialTimeout,
 		ReadTimeout:     r.ReadTimeout,
 		WriteTimeout:    r.WriteTimeout,
+		PoolTimeout:     r.PoolTimeout,
 	}
 	if r.TLS {
 		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
@@ -234,6 +248,7 @@ func (r Redis) applyPool(opts *redis.Options) {
 	opts.DialTimeout = r.DialTimeout
 	opts.ReadTimeout = r.ReadTimeout
 	opts.WriteTimeout = r.WriteTimeout
+	opts.PoolTimeout = r.PoolTimeout
 	if r.TLS && opts.TLSConfig == nil {
 		opts.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 	}

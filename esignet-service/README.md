@@ -211,6 +211,7 @@ Keymanager also exposes its own HTTP endpoints (mirroring the Java service's `Sy
 | `REDIS_DIAL_TIMEOUT_SECS` | `5` | |
 | `REDIS_READ_TIMEOUT_SECS` | `3` | |
 | `REDIS_WRITE_TIMEOUT_SECS` | `3` | |
+| `REDIS_POOL_TIMEOUT_SECS` | `4` | Seconds to wait for a free pool connection before returning an error |
 | `REDIS_KEY_PREFIX` | `esignet:` | Namespace prefix for all keys |
 
 ### Client management API

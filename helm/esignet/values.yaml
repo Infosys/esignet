@@ -307,6 +307,10 @@ extraEnvVars: |
       secretKeyRef:
         name: redis
         key: redis-password
+  - name: REDIS_POOL_SIZE
+    value: "100"
+  - name: REDIS_MIN_IDLE_CONNS
+    value: "10"
   - name: DATABASE_HOST
     valueFrom:
       configMapKeyRef:

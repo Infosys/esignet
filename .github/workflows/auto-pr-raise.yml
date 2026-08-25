@@ -1,0 +1,106 @@
+name: Sync release PR to develop
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - "release**" # adjust to match your release branch naming, e.g. 'release' or 'release/*'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync-to-develop:
+    # Only run if the PR was actually merged (not just closed)
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need full history for cherry-pick
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine target develop branch from label
+        id: target
+        env:
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          # Map each sync label to the develop branch it should sync into.
+          # Add/remove entries here as needed.
+          declare -A LABEL_TO_BRANCH=(
+            ["sync-to-develop"]="develop"
+            ["sync-to-develop-go"]="develop-go"
+          )
+
+          TARGET_BRANCH=""
+          MATCHED_LABEL=""
+          for label in $(echo "$PR_LABELS" | jq -r '.[]'); do
+            if [[ -n "${LABEL_TO_BRANCH[$label]:-}" ]]; then
+              TARGET_BRANCH="${LABEL_TO_BRANCH[$label]}"
+              MATCHED_LABEL="$label"
+              break
+            fi
+          done
+
+          if [[ -z "$TARGET_BRANCH" ]]; then
+            echo "No sync label found on this PR — skipping sync."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+          echo "develop_branch=$TARGET_BRANCH" >> "$GITHUB_OUTPUT"
+          echo "matched_label=$MATCHED_LABEL" >> "$GITHUB_OUTPUT"
+
+      - name: Configure git
+        if: steps.target.outputs.skip == 'false'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Create sync branch from target develop branch
+        if: steps.target.outputs.skip == 'false'
+        id: branch
+        run: |
+          DEVELOP_BRANCH="${{ steps.target.outputs.develop_branch }}"
+          BRANCH_NAME="sync/pr-${{ github.event.pull_request.number }}-to-${DEVELOP_BRANCH}"
+          git fetch origin "$DEVELOP_BRANCH"
+          git checkout -b "$BRANCH_NAME" "origin/$DEVELOP_BRANCH"
+          echo "branch_name=$BRANCH_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Cherry-pick merged commit
+        if: steps.target.outputs.skip == 'false'
+        id: cherry_pick
+        run: |
+          if git cherry-pick -m 1 ${{ github.event.pull_request.merge_commit_sha }}; then
+            echo "success=true" >> "$GITHUB_OUTPUT"
+          else
+            git cherry-pick --abort
+            echo "success=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Push branch
+        if: steps.target.outputs.skip == 'false' && steps.cherry_pick.outputs.success == 'true'
+        run: git push origin HEAD:${{ steps.branch.outputs.branch_name }}
+
+      - name: Create PR into target develop branch
+        if: steps.target.outputs.skip == 'false' && steps.cherry_pick.outputs.success == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr create \
+            --base "${{ steps.target.outputs.develop_branch }}" \
+            --head "${{ steps.branch.outputs.branch_name }}" \
+            --title "sync: ${{ github.event.pull_request.title }} (#${{ github.event.pull_request.number }})" \
+            --body "Auto-generated PR to sync changes from #${{ github.event.pull_request.number }} into \`${{ steps.target.outputs.develop_branch }}\`." \
+            --label "${{ steps.target.outputs.matched_label }}"
+
+      - name: Notify on conflict
+        if: steps.target.outputs.skip == 'false' && steps.cherry_pick.outputs.success == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --body "⚠️ Auto-sync to \`${{ steps.target.outputs.develop_branch }}\` failed due to a cherry-pick conflict. Please sync this PR's changes manually."

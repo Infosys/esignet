@@ -8,6 +8,7 @@ import type { ResendOtpFlowComponent } from "../../components/ResendOtpComponent
 
 import type { ComponentRenderContext } from "@thunderid/react";
 
+// Returns the key itself so assertions can match on translation keys.
 const mockT = vi.fn((key: string) => key);
 
 // Capture the captchaChanged callback that the component passes to CaptchaComponent
@@ -18,31 +19,20 @@ const captchaChangedCapture = vi.hoisted(() => ({
 }));
 
 vi.mock(import("@thunderid/react"), async (importOriginal) => {
-  const original = (await importOriginal()) as any;
+  const original = await importOriginal();
   return {
     ...original,
-    useTranslation: () => ({ t: mockT }),
-    Button: ({
-      children,
-      disabled,
-      onClick,
-      id,
-    }: {
-      children: React.ReactNode;
-      disabled?: boolean;
-      onClick?: () => void;
-      id?: string;
-    }) =>
-      React.createElement(
-        "button",
-        { disabled, onClick, id, "data-testid": "resend-button" },
-        children,
-      ),
+    useTranslation: () => ({
+      t: mockT,
+      availableLanguages: [],
+      currentLanguage: "en",
+      setLanguage: vi.fn(),
+    }),
   };
 });
 
 vi.mock("../../components/index", async (importOriginal) => {
-  const original = (await importOriginal()) as any;
+  const original = (await importOriginal()) as Record<string, unknown>;
   return {
     ...original,
     CaptchaComponent: ({
@@ -55,6 +45,15 @@ vi.mock("../../components/index", async (importOriginal) => {
     },
   };
 });
+
+const CAPTCHA = { provider: "hcaptcha" as const, siteKey: "k" };
+
+// The mocked t() returns the key, so assertions match on translation keys.
+const TEXT = {
+  prompt: "otp.didnt_receive_otp",
+  captchaPrompt: "otp.resend_captcha_prompt",
+  requiredError: "validations.required.field.error",
+};
 
 function makeComponent(
   overrides: Partial<ResendOtpFlowComponent> = {},
@@ -81,48 +80,18 @@ function makeContext(
   } as unknown as ComponentRenderContext;
 }
 
-// ── Tests without fake timers ──────────────────────────────────────────────────
-//
-// The component initialises timeLeft=true and flips it to false via useEffect.
-// vi.useFakeTimers() can intercept React 18's internal scheduler, preventing that
-// effect from flushing. Any test that needs timeLeft=false must use real timers.
-describe("ResendOtpComponent — rendering and initial state", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    captchaChangedCapture.fn = undefined;
-  });
+const resendLink = () => screen.getByTestId("thunderid-resend-otp-button");
+const queryResendLink = () =>
+  screen.queryByTestId("thunderid-resend-otp-button");
+const cancelLink = () => screen.getByTestId("thunderid-resend-otp-cancel");
 
-  it("renders the resend button", () => {
-    render(
-      <ResendOtpComponent
-        component={makeComponent()}
-        context={makeContext()}
-      />,
-    );
-    expect(screen.getByTestId("resend-button")).toBeDefined();
-  });
+beforeEach(() => {
+  vi.clearAllMocks();
+  captchaChangedCapture.fn = undefined;
+});
 
-  it("button is enabled when timeLeft is 0", () => {
-    render(
-      <ResendOtpComponent
-        component={makeComponent({ timeLeft: 0 })}
-        context={makeContext()}
-      />,
-    );
-    expect(screen.getByTestId("resend-button")).not.toBeDisabled();
-  });
-
-  it("button is disabled while the countdown is active", () => {
-    render(
-      <ResendOtpComponent
-        component={makeComponent({ timeLeft: 60 })}
-        context={makeContext()}
-      />,
-    );
-    expect(screen.getByTestId("resend-button")).toBeDisabled();
-  });
-
-  it("shows the countdown timer heading while time remains", () => {
+describe("ResendOtpComponent — countdown state", () => {
+  it("shows the countdown and hides the resend action while time remains", () => {
     render(
       <ResendOtpComponent
         component={makeComponent({ timeLeft: 90 })}
@@ -130,15 +99,13 @@ describe("ResendOtpComponent — rendering and initial state", () => {
       />,
     );
     expect(screen.getByText(/app\.otp\.resend_timer/)).toBeDefined();
+    expect(queryResendLink()).toBeNull();
   });
 
-  it("does not show captcha when timeLeft > 0", () => {
+  it("does not show the captcha while the countdown is active", () => {
     render(
       <ResendOtpComponent
-        component={makeComponent({
-          timeLeft: 60,
-          captcha: { provider: "hcaptcha", siteKey: "k" },
-        })}
+        component={makeComponent({ timeLeft: 60, captcha: CAPTCHA })}
         context={makeContext()}
       />,
     );
@@ -146,13 +113,44 @@ describe("ResendOtpComponent — rendering and initial state", () => {
   });
 });
 
-describe("ResendOtpComponent — submit without captcha", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    captchaChangedCapture.fn = undefined;
+describe("ResendOtpComponent — collapsed state once the countdown elapses", () => {
+  it("shows the prompt and the resend action", () => {
+    render(
+      <ResendOtpComponent
+        component={makeComponent({ timeLeft: 0 })}
+        context={makeContext()}
+      />,
+    );
+    expect(screen.getByText(TEXT.prompt)).toBeDefined();
+    expect(resendLink()).toBeDefined();
   });
 
-  it("calls resetForm then onSubmit with an empty payload when no captcha is configured", () => {
+  it("keeps the captcha hidden until the user asks to resend", () => {
+    render(
+      <ResendOtpComponent
+        component={makeComponent({ timeLeft: 0, captcha: CAPTCHA })}
+        context={makeContext()}
+      />,
+    );
+    expect(screen.queryByTestId("captcha")).toBeNull();
+  });
+
+  it("groups the captcha inside the resend panel, not loose in the card", () => {
+    const { container } = render(
+      <ResendOtpComponent
+        component={makeComponent({ timeLeft: 0, captcha: CAPTCHA })}
+        context={makeContext()}
+      />,
+    );
+    fireEvent.click(resendLink());
+    const panel = container.querySelector(".resend-otp-panel");
+    expect(panel).not.toBeNull();
+    expect(panel?.contains(screen.getByTestId("captcha"))).toBe(true);
+  });
+});
+
+describe("ResendOtpComponent — resend without a captcha configured", () => {
+  it("calls resetForm then onSubmit with an empty payload", () => {
     const context = makeContext();
     render(
       <ResendOtpComponent
@@ -160,7 +158,7 @@ describe("ResendOtpComponent — submit without captcha", () => {
         context={context}
       />,
     );
-    fireEvent.click(screen.getByTestId("resend-button"));
+    fireEvent.click(resendLink());
     expect(context.resetForm).toHaveBeenCalled();
     expect(context.onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ id: "resend-otp" }),
@@ -169,172 +167,135 @@ describe("ResendOtpComponent — submit without captcha", () => {
     );
   });
 
-  it("does not throw and skips submit body when onSubmit is absent — covers if(onSubmit) false branch", () => {
-    const context = makeContext({ onSubmit: undefined as any });
+  it("does not throw when onSubmit is absent", () => {
+    const context = makeContext({ onSubmit: undefined });
     render(
       <ResendOtpComponent
         component={makeComponent({ timeLeft: 0 })}
         context={context}
       />,
     );
-    expect(() =>
-      fireEvent.click(screen.getByTestId("resend-button")),
-    ).not.toThrow();
+    expect(() => fireEvent.click(resendLink())).not.toThrow();
   });
 
-  it("does not throw when resetForm is absent — covers resetForm && resetForm() false branch", () => {
-    const context = makeContext({ resetForm: undefined as any });
+  it("does not throw when resetForm is absent and still submits", () => {
+    const context = makeContext({ resetForm: undefined });
     render(
       <ResendOtpComponent
         component={makeComponent({ timeLeft: 0 })}
         context={context}
       />,
     );
-    expect(() =>
-      fireEvent.click(screen.getByTestId("resend-button")),
-    ).not.toThrow();
+    expect(() => fireEvent.click(resendLink())).not.toThrow();
     expect(context.onSubmit).toHaveBeenCalled();
   });
 });
 
-describe("ResendOtpComponent — captcha interaction", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    captchaChangedCapture.fn = undefined;
-  });
-
-  it("shows captcha widget when timeLeft is 0 and captcha is configured", () => {
+describe("ResendOtpComponent — captcha-gated resend", () => {
+  it("reveals the captcha instead of submitting on the first click", () => {
+    const context = makeContext();
     render(
       <ResendOtpComponent
-        component={makeComponent({
-          timeLeft: 0,
-          captcha: { provider: "hcaptcha", siteKey: "k" },
-        })}
-        context={makeContext()}
+        component={makeComponent({ timeLeft: 0, captcha: CAPTCHA })}
+        context={context}
       />,
     );
+    fireEvent.click(resendLink());
     expect(screen.getByTestId("captcha")).toBeDefined();
-  });
-
-  it("blocks submission, calls onInputChange, and disables the button when captcha token is missing", () => {
-    const context = makeContext();
-    render(
-      <ResendOtpComponent
-        component={makeComponent({
-          timeLeft: 0,
-          captcha: { provider: "hcaptcha", siteKey: "k" },
-        })}
-        context={context}
-      />,
-    );
-    // Button starts enabled (timeLeft=false, captchaError=false)
-    expect(screen.getByTestId("resend-button")).not.toBeDisabled();
-    fireEvent.click(screen.getByTestId("resend-button"));
+    expect(screen.getByText(TEXT.captchaPrompt)).toBeDefined();
     expect(context.onSubmit).not.toHaveBeenCalled();
-    expect(context.onInputChange).toHaveBeenCalledWith(
-      "resend-otp_captcha",
-      "",
-    );
-    // setCaptchaError(true) → disabled={false || true} = true
-    expect(screen.getByTestId("resend-button")).toBeDisabled();
   });
 
-  it("shows the captcha error message in the UI after a blocked submission", () => {
-    render(
-      <ResendOtpComponent
-        component={makeComponent({
-          timeLeft: 0,
-          captcha: { provider: "hcaptcha", siteKey: "k" },
-        })}
-        context={makeContext()}
-      />,
-    );
-    expect(screen.queryByText("validations.required.field.error")).toBeNull();
-    fireEvent.click(screen.getByTestId("resend-button"));
-    // captchaError state is now true → error div renders with the translation key
-    expect(screen.getByText("validations.required.field.error")).toBeDefined();
-  });
-
-  it("captchaChanged with a valid token clears the error and keeps the button enabled", () => {
-    render(
-      <ResendOtpComponent
-        component={makeComponent({
-          timeLeft: 0,
-          captcha: { provider: "hcaptcha", siteKey: "k" },
-        })}
-        context={makeContext()}
-      />,
-    );
-    // captchaChangedCapture.fn is set when CaptchaComponent renders
-    act(() => {
-      captchaChangedCapture.fn?.("valid-token");
-    });
-    // setCaptchaError(false) → disabled={false || false} = false
-    expect(screen.getByTestId("resend-button")).not.toBeDisabled();
-    expect(screen.queryByText("validations.required.field.error")).toBeNull();
-  });
-
-  it('captchaChanged with null sets captcha error and disables the button — covers null branch of token ?? ""', () => {
-    render(
-      <ResendOtpComponent
-        component={makeComponent({
-          timeLeft: 0,
-          captcha: { provider: "hcaptcha", siteKey: "k" },
-        })}
-        context={makeContext()}
-      />,
-    );
-    act(() => {
-      captchaChangedCapture.fn?.(null);
-    });
-    // setCaptchaError(true) → disabled={false || true} = true
-    expect(screen.getByTestId("resend-button")).toBeDisabled();
-  });
-
-  it("captchaChanged with an empty string sets captcha error — covers trim().length === 0 branch", () => {
-    render(
-      <ResendOtpComponent
-        component={makeComponent({
-          timeLeft: 0,
-          captcha: { provider: "hcaptcha", siteKey: "k" },
-        })}
-        context={makeContext()}
-      />,
-    );
-    act(() => {
-      captchaChangedCapture.fn?.("");
-    });
-    expect(screen.getByTestId("resend-button")).toBeDisabled();
-  });
-
-  it("submits with captcha_token in payload after a valid captchaChanged call", () => {
+  it("submits with the captcha token once the captcha is solved", () => {
     const context = makeContext();
     render(
       <ResendOtpComponent
-        component={makeComponent({
-          timeLeft: 0,
-          captcha: { provider: "hcaptcha", siteKey: "k" },
-        })}
+        component={makeComponent({ timeLeft: 0, captcha: CAPTCHA })}
         context={context}
       />,
     );
-    act(() => {
-      captchaChangedCapture.fn?.("my-token");
-    });
-    fireEvent.click(screen.getByTestId("resend-button"));
+    fireEvent.click(resendLink());
+    act(() => captchaChangedCapture.fn?.("my-token"));
+
+    expect(context.resetForm).toHaveBeenCalled();
     expect(context.onSubmit).toHaveBeenCalledWith(
       expect.objectContaining({ id: "resend-otp" }),
       { captcha_token: "my-token" },
       true,
     );
   });
+
+  it("collapses the panel back to the prompt after a successful resend", () => {
+    render(
+      <ResendOtpComponent
+        component={makeComponent({ timeLeft: 0, captcha: CAPTCHA })}
+        context={makeContext()}
+      />,
+    );
+    fireEvent.click(resendLink());
+    act(() => captchaChangedCapture.fn?.("my-token"));
+
+    expect(screen.queryByTestId("captcha")).toBeNull();
+    expect(screen.getByText(TEXT.prompt)).toBeDefined();
+  });
+
+  it("submits only once when the captcha token is refreshed", () => {
+    const context = makeContext();
+    render(
+      <ResendOtpComponent
+        component={makeComponent({ timeLeft: 0, captcha: CAPTCHA })}
+        context={context}
+      />,
+    );
+    fireEvent.click(resendLink());
+    act(() => captchaChangedCapture.fn?.("token-a"));
+    act(() => captchaChangedCapture.fn?.("token-b"));
+
+    expect(context.onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ["null", null],
+    ["an empty string", ""],
+    ["whitespace", "   "],
+  ])("shows an error and does not submit for %s", (_label, token) => {
+    const context = makeContext();
+    render(
+      <ResendOtpComponent
+        component={makeComponent({ timeLeft: 0, captcha: CAPTCHA })}
+        context={context}
+      />,
+    );
+    fireEvent.click(resendLink());
+    act(() => captchaChangedCapture.fn?.(token));
+
+    expect(screen.getByText(TEXT.requiredError)).toBeDefined();
+    expect(context.onSubmit).not.toHaveBeenCalled();
+  });
+
+  it("cancel hides the captcha, clears the stored token and restores the prompt", () => {
+    const context = makeContext();
+    render(
+      <ResendOtpComponent
+        component={makeComponent({ timeLeft: 0, captcha: CAPTCHA })}
+        context={context}
+      />,
+    );
+    fireEvent.click(resendLink());
+    fireEvent.click(cancelLink());
+
+    expect(screen.queryByTestId("captcha")).toBeNull();
+    expect(screen.getByText(TEXT.prompt)).toBeDefined();
+    expect(context.onInputChange).toHaveBeenCalledWith(
+      "resend-otp_captcha",
+      "",
+    );
+    expect(context.onSubmit).not.toHaveBeenCalled();
+  });
 });
 
-// ── Tests that advance fake timers to control the countdown ───────────────────
 describe("ResendOtpComponent — countdown timer", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
-    captchaChangedCapture.fn = undefined;
     vi.useFakeTimers();
   });
 
@@ -342,72 +303,41 @@ describe("ResendOtpComponent — countdown timer", () => {
     vi.useRealTimers();
   });
 
-  it("hides the countdown heading when timer reaches zero", () => {
-    render(
-      <ResendOtpComponent
-        component={makeComponent({ timeLeft: 1 })}
-        context={makeContext()}
-      />,
-    );
-    act(() => {
-      vi.advanceTimersByTime(1500);
-    });
-    expect(screen.queryByText(/app\.otp\.resend_timer/)).toBeNull();
-  });
-
-  it("button becomes enabled after the countdown expires", () => {
-    render(
-      <ResendOtpComponent
-        component={makeComponent({ timeLeft: 1 })}
-        context={makeContext()}
-      />,
-    );
-    act(() => {
-      vi.advanceTimersByTime(1500);
-    });
-    expect(screen.getByTestId("resend-button")).not.toBeDisabled();
-  });
-
-  it("decrements the countdown — covers return prev - 1 branch (prev > 1)", () => {
-    // timeLeft: 2 → first tick: prev=2 > 1, returns prev-1=1 (false branch of if prev<=1)
+  it("decrements each second and reveals the prompt at zero", () => {
     render(
       <ResendOtpComponent
         component={makeComponent({ timeLeft: 2 })}
         context={makeContext()}
       />,
     );
-    act(() => {
-      vi.advanceTimersByTime(1000);
-    });
+    act(() => void vi.advanceTimersByTime(1000));
     expect(screen.getByText(/app\.otp\.resend_timer/)).toBeDefined();
-    act(() => {
-      vi.advanceTimersByTime(1000);
-    });
+
+    act(() => void vi.advanceTimersByTime(1000));
     expect(screen.queryByText(/app\.otp\.resend_timer/)).toBeNull();
+    expect(resendLink()).toBeDefined();
   });
 
-  it("shows captcha widget after timer expires when captcha is configured", () => {
+  it("restarts the countdown after a resend", () => {
     render(
       <ResendOtpComponent
-        component={makeComponent({
-          timeLeft: 1,
-          captcha: { provider: "hcaptcha", siteKey: "k" },
-        })}
+        component={makeComponent({ timeLeft: 2 })}
         context={makeContext()}
       />,
     );
-    act(() => {
-      vi.advanceTimersByTime(1500);
-    });
-    expect(screen.getByTestId("captcha")).toBeDefined();
+    act(() => void vi.advanceTimersByTime(2000));
+    fireEvent.click(resendLink());
+
+    expect(screen.getByText(/app\.otp\.resend_timer/)).toBeDefined();
+    expect(queryResendLink()).toBeNull();
   });
 });
 
 describe("ResendOtpRenderer", () => {
-  it("wraps ResendOtpComponent in a back-button-renderer div", () => {
+  it("wraps ResendOtpComponent in a resend-otp-renderer div", () => {
     const { container } = render(
       <>{ResendOtpRenderer(makeComponent(), makeContext())}</>,
     );
-    expect(container.querySelector(".back-button-renderer")).not.toBeNull();
+    expect(container.querySelector(".resend-otp-renderer")).not.toBeNull();
   });
 });
